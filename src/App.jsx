@@ -1,34 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown } from "lucide-react";
+import {
+  Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  CheckCircle2, Circle, Download,
+} from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
-
-// Guarda o estado no localStorage do navegador quando disponível.
-// Em ambientes sem acesso (ex: prévia sandboxed do Claude) cai de volta pro comportamento normal em memória.
-function useLocalStorageState(chave, valorInicial) {
-  const [valor, setValor] = useState(() => {
-    try {
-      const salvo = window.localStorage.getItem(chave);
-      return salvo !== null ? JSON.parse(salvo) : valorInicial;
-    } catch {
-      return valorInicial;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(chave, JSON.stringify(valor));
-    } catch {
-      // sem acesso a localStorage neste ambiente — os dados continuam funcionando só em memória
-    }
-  }, [chave, valor]);
-
-  return [valor, setValor];
-}
-
 
 const COR = {
   papel: "#F3EFE2",
@@ -42,8 +22,32 @@ const COR = {
   roxoClaro: "#F1E1FB",
   americanas: "#C81032",
   americanasClaro: "#F8D9DF",
+  verde: "#2E7D5B",
+  verdeClaro: "#DCEEE3",
   vermelho: "#A83232",
 };
+
+const CATEGORIAS = ["Moradia", "Alimentação", "Transporte", "Saúde", "Lazer", "Educação", "Assinaturas", "Outros"];
+const CORES_CATEGORIA = ["#B8891F", "#2E7D5B", "#2A6F97", "#A83232", "#7A4FB5", "#B5651D", "#4A5164", "#8A8F63"];
+const corCategoria = (nome) => {
+  const i = CATEGORIAS.indexOf(nome);
+  return CORES_CATEGORIA[i >= 0 ? i : CORES_CATEGORIA.length - 1];
+};
+
+const PALETA_CARTOES = [
+  { cor: "#820AD1", corClara: "#F1E1FB" },
+  { cor: "#C81032", corClara: "#F8D9DF" },
+  { cor: "#1F7A5C", corClara: "#D7F0E4" },
+  { cor: "#B5651D", corClara: "#F5DFC4" },
+  { cor: "#2A6F97", corClara: "#D6E9F5" },
+  { cor: "#7A4FB5", corClara: "#E7DBF7" },
+];
+const corDoCartao = (indice) => PALETA_CARTOES[indice % PALETA_CARTOES.length];
+
+const CARTOES_PADRAO = [
+  { id: "nubank", nome: "Cartão Nubank", cor: PALETA_CARTOES[0].cor, corClara: PALETA_CARTOES[0].corClara, compras: [] },
+  { id: "americanas", nome: "Cartão Americanas", cor: PALETA_CARTOES[1].cor, corClara: PALETA_CARTOES[1].corClara, compras: [] },
+];
 
 const fmt = (v) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
@@ -60,10 +64,13 @@ const rotuloDoMes = (chave) => {
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const ehJefferson = (nome) => (nome || "").trim().toLowerCase() === "jefferson";
+const ehPessoaAutomatica = (nome, lista) =>
+  lista.some((p) => p.trim().toLowerCase() === (nome || "").trim().toLowerCase());
 
-const totalJeffersonEmMes = (comprasPorMesObj, chave) =>
-  (comprasPorMesObj[chave] || []).filter((c) => ehJefferson(c.nome)).reduce((s, c) => s + c.valor, 0);
+const totalAutomaticoEmMes = (comprasPorMesObj, chave, pessoas) =>
+  (comprasPorMesObj[chave] || []).filter((c) => ehPessoaAutomatica(c.nome, pessoas)).reduce((s, c) => s + c.valor, 0);
+
+const hojeISO = () => new Date().toISOString().slice(0, 10);
 
 const mesAtualChave = () => {
   const d = new Date();
@@ -87,6 +94,29 @@ const preencherIntervaloMeses = (chaves) => {
   }
   return resultado;
 };
+
+// Guarda o estado no localStorage do navegador quando disponível.
+// Em ambientes sem acesso (ex: prévia sandboxed do Claude) cai de volta pro comportamento normal em memória.
+function useLocalStorageState(chave, valorInicial) {
+  const [valor, setValor] = useState(() => {
+    try {
+      const salvo = window.localStorage.getItem(chave);
+      return salvo !== null ? JSON.parse(salvo) : valorInicial;
+    } catch {
+      return valorInicial;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(chave, JSON.stringify(valor));
+    } catch {
+      // sem acesso a localStorage neste ambiente — os dados continuam funcionando só em memória
+    }
+  }, [chave, valor]);
+
+  return [valor, setValor];
+}
 
 // Carrossel horizontal de meses, no estilo fatura (rolagem lateral, mês ativo em destaque)
 function CarrosselMeses({ meses, mesSelecionado, onSelecionar, corAtiva }) {
@@ -127,10 +157,37 @@ function Campo({ label, children }) {
 const inputBase =
   "box-border h-10 px-2.5 rounded-md border bg-white outline-none text-sm focus:ring-2";
 
+// Botão de excluir com confirmação em duas etapas (evita apagar sem querer)
+function BotaoExcluirConfirmar({ onConfirmar }) {
+  const [confirmando, setConfirmando] = useState(false);
+  if (confirmando) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <button onClick={() => { onConfirmar(); setConfirmando(false); }} style={{ color: COR.vermelho }} title="Confirmar exclusão">
+          <Check size={15} />
+        </button>
+        <button onClick={() => setConfirmando(false)} style={{ color: COR.tintaSuave }} title="Cancelar">
+          <X size={15} />
+        </button>
+      </span>
+    );
+  }
+  return (
+    <button onClick={() => setConfirmando(true)} style={{ color: COR.vermelho }} title="Excluir">
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
 export default function MeuCaixaApp() {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
-  const abas = ["despesas", "cartao", "americanas"];
-  const indiceAba = abas.indexOf(aba);
+  const [despesas, setDespesas] = useLocalStorageState("meu-caixa:despesas", []);
+  const [cartoes, setCartoes] = useLocalStorageState("meu-caixa:cartoes", CARTOES_PADRAO);
+  const [pessoasAutomaticas, setPessoasAutomaticas] = useLocalStorageState("meu-caixa:pessoas-automaticas", ["Jefferson"]);
+
+  const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
+  const indiceAbaBruto = abas.indexOf(aba);
+  const indiceAba = indiceAbaBruto === -1 ? 0 : indiceAbaBruto;
 
   // ---------- gesto de deslizar entre abas ----------
   const [arraste, setArraste] = useState(0);
@@ -149,10 +206,10 @@ export default function MeuCaixaApp() {
     if (!arrastandoRef.current || ignorarGestoRef.current) return;
     const dx = e.touches[0].clientX - inicioRef.current.x;
     const dy = e.touches[0].clientY - inicioRef.current.y;
-    if (Math.abs(dy) > Math.abs(dx)) return; // gesto vertical, deixa a página rolar
+    if (Math.abs(dy) > Math.abs(dx)) return;
     let deslocamento = dx;
-    if (indiceAba === 0 && dx > 0) deslocamento = dx / 3; // resistência na primeira aba
-    if (indiceAba === abas.length - 1 && dx < 0) deslocamento = dx / 3; // resistência na última
+    if (indiceAba === 0 && dx > 0) deslocamento = dx / 3;
+    if (indiceAba === abas.length - 1 && dx < 0) deslocamento = dx / 3;
     setArraste(deslocamento);
   };
 
@@ -165,172 +222,47 @@ export default function MeuCaixaApp() {
     setArraste(0);
   };
 
-  // ---------- despesas ----------
-  const [despesas, setDespesas] = useLocalStorageState("meu-caixa:despesas", []);
-  const [novaDespesa, setNovaDespesa] = useState({ descricao: "", valor: "", vencimento: "" });
-  const [mostrarFormDespesa, setMostrarFormDespesa] = useState(false);
-  const [editandoDespesaId, setEditandoDespesaId] = useState(null);
-  const [rascunhoDespesa, setRascunhoDespesa] = useState(null);
+  // ---------- cartões (dinâmicos) ----------
+  const [mostrarAddCartao, setMostrarAddCartao] = useState(false);
+  const [nomeNovoCartao, setNomeNovoCartao] = useState("");
 
-  // ---------- cartão nubank ----------
-  const [compras, setCompras] = useLocalStorageState("meu-caixa:compras-nubank", []);
-  const [novaCompra, setNovaCompra] = useState({ nome: "", compra: "", valor: "", data: "" });
-  const [mostrarFormCompra, setMostrarFormCompra] = useState(false);
-  const [editandoCompraId, setEditandoCompraId] = useState(null);
-  const [rascunhoCompra, setRascunhoCompra] = useState(null);
-
-  // ---------- cartão americanas ----------
-  const [comprasAmericanas, setComprasAmericanas] = useLocalStorageState("meu-caixa:compras-americanas", []);
-  const [novaCompraAmericanas, setNovaCompraAmericanas] = useState({ nome: "", compra: "", valor: "", data: "" });
-  const [mostrarFormCompraAmericanas, setMostrarFormCompraAmericanas] = useState(false);
-  const [editandoCompraAmericanasId, setEditandoCompraAmericanasId] = useState(null);
-  const [rascunhoCompraAmericanas, setRascunhoCompraAmericanas] = useState(null);
-
-  // ---------- agrupamentos ----------
-  const despesasPorMes = useMemo(() => {
-    const grupos = {};
-    for (const d of despesas) {
-      const chave = chaveDoMes(d.vencimento);
-      (grupos[chave] ||= []).push(d);
-    }
-    return grupos;
-  }, [despesas]);
-
-  const comprasPorMes = useMemo(() => {
-    const grupos = {};
-    for (const c of compras) {
-      const chave = chaveDoMes(c.data);
-      (grupos[chave] ||= []).push(c);
-    }
-    return grupos;
-  }, [compras]);
-
-  const comprasAmericanasPorMes = useMemo(() => {
-    const grupos = {};
-    for (const c of comprasAmericanas) {
-      const chave = chaveDoMes(c.data);
-      (grupos[chave] ||= []).push(c);
-    }
-    return grupos;
-  }, [comprasAmericanas]);
-
-  const totalJeffersonPorMes = (chave) => totalJeffersonEmMes(comprasPorMes, chave);
-  const totalJeffersonAmericanasPorMes = (chave) => totalJeffersonEmMes(comprasAmericanasPorMes, chave);
-
-  const chavesDespesas = useMemo(() => {
-    const chaves = new Set(Object.keys(despesasPorMes));
-    for (const chave of Object.keys(comprasPorMes)) {
-      if (totalJeffersonPorMes(chave) > 0) chaves.add(chave);
-    }
-    for (const chave of Object.keys(comprasAmericanasPorMes)) {
-      if (totalJeffersonAmericanasPorMes(chave) > 0) chaves.add(chave);
-    }
-    return [...chaves].sort();
-  }, [despesasPorMes, comprasPorMes, comprasAmericanasPorMes]);
-
-  const totalGeralDespesas = chavesDespesas.reduce((soma, chave) => {
-    const linhas = despesasPorMes[chave] || [];
-    return soma + linhas.reduce((s, d) => s + d.valor, 0) + totalJeffersonPorMes(chave) + totalJeffersonAmericanasPorMes(chave);
-  }, 0);
-
-  // ---------- ações despesas ----------
-  const adicionarDespesa = () => {
-    const valor = parseFloat(novaDespesa.valor);
-    if (!novaDespesa.descricao.trim() || !novaDespesa.vencimento || !(valor > 0)) return;
-    setDespesas((prev) => [
-      ...prev,
-      { id: uid(), descricao: novaDespesa.descricao.trim(), valor, vencimento: novaDespesa.vencimento },
-    ]);
-    setNovaDespesa({ descricao: "", valor: "", vencimento: "" });
-    setMostrarFormDespesa(false);
+  const adicionarCartao = () => {
+    const nome = nomeNovoCartao.trim();
+    if (!nome) return;
+    const id = uid();
+    const paleta = corDoCartao(cartoes.length);
+    setCartoes((prev) => [...prev, { id, nome, cor: paleta.cor, corClara: paleta.corClara, compras: [] }]);
+    setAba(`cartao-${id}`);
+    setNomeNovoCartao("");
+    setMostrarAddCartao(false);
   };
 
-  const iniciarEdicaoDespesa = (d) => {
-    setEditandoDespesaId(d.id);
-    setRascunhoDespesa({ ...d, valor: String(d.valor) });
+  const excluirCartao = (id) => {
+    setCartoes((prev) => prev.filter((c) => c.id !== id));
+    setAba((atual) => (atual === `cartao-${id}` ? "despesas" : atual));
   };
 
-  const salvarEdicaoDespesa = () => {
-    const valor = parseFloat(rascunhoDespesa.valor);
-    if (!rascunhoDespesa.descricao.trim() || !rascunhoDespesa.vencimento || !(valor > 0)) return;
-    setDespesas((prev) =>
-      prev.map((d) =>
-        d.id === editandoDespesaId
-          ? { ...d, descricao: rascunhoDespesa.descricao.trim(), valor, vencimento: rascunhoDespesa.vencimento }
-          : d
-      )
-    );
-    setEditandoDespesaId(null);
-    setRascunhoDespesa(null);
+  // ---------- pessoas com soma automática ----------
+  const adicionarPessoaAutomatica = (nome) => {
+    const limpo = nome.trim();
+    if (!limpo) return;
+    setPessoasAutomaticas((prev) => (prev.some((p) => p.toLowerCase() === limpo.toLowerCase()) ? prev : [...prev, limpo]));
   };
+  const removerPessoaAutomatica = (nome) => setPessoasAutomaticas((prev) => prev.filter((p) => p !== nome));
 
-  const excluirDespesa = (id) => setDespesas((prev) => prev.filter((d) => d.id !== id));
-
-  // ---------- ações cartão ----------
-  const adicionarCompra = () => {
-    const valor = parseFloat(novaCompra.valor);
-    if (!novaCompra.nome.trim() || !novaCompra.compra.trim() || !novaCompra.data || !(valor > 0)) return;
-    setCompras((prev) => [
-      ...prev,
-      { id: uid(), nome: novaCompra.nome.trim(), compra: novaCompra.compra.trim(), valor, data: novaCompra.data },
-    ]);
-    setNovaCompra({ nome: "", compra: "", valor: "", data: "" });
-    setMostrarFormCompra(false);
+  // ---------- exportar dados ----------
+  const exportarDados = () => {
+    const payload = { despesas, cartoes, pessoasAutomaticas, exportadoEm: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `meu-caixa-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
-
-  const iniciarEdicaoCompra = (c) => {
-    setEditandoCompraId(c.id);
-    setRascunhoCompra({ ...c, valor: String(c.valor) });
-  };
-
-  const salvarEdicaoCompra = () => {
-    const valor = parseFloat(rascunhoCompra.valor);
-    if (!rascunhoCompra.nome.trim() || !rascunhoCompra.compra.trim() || !rascunhoCompra.data || !(valor > 0)) return;
-    setCompras((prev) =>
-      prev.map((c) =>
-        c.id === editandoCompraId
-          ? { ...c, nome: rascunhoCompra.nome.trim(), compra: rascunhoCompra.compra.trim(), valor, data: rascunhoCompra.data }
-          : c
-      )
-    );
-    setEditandoCompraId(null);
-    setRascunhoCompra(null);
-  };
-
-  const excluirCompra = (id) => setCompras((prev) => prev.filter((c) => c.id !== id));
-
-  // ---------- ações cartão americanas ----------
-  const adicionarCompraAmericanas = () => {
-    const valor = parseFloat(novaCompraAmericanas.valor);
-    if (!novaCompraAmericanas.nome.trim() || !novaCompraAmericanas.compra.trim() || !novaCompraAmericanas.data || !(valor > 0)) return;
-    setComprasAmericanas((prev) => [
-      ...prev,
-      { id: uid(), nome: novaCompraAmericanas.nome.trim(), compra: novaCompraAmericanas.compra.trim(), valor, data: novaCompraAmericanas.data },
-    ]);
-    setNovaCompraAmericanas({ nome: "", compra: "", valor: "", data: "" });
-    setMostrarFormCompraAmericanas(false);
-  };
-
-  const iniciarEdicaoCompraAmericanas = (c) => {
-    setEditandoCompraAmericanasId(c.id);
-    setRascunhoCompraAmericanas({ ...c, valor: String(c.valor) });
-  };
-
-  const salvarEdicaoCompraAmericanas = () => {
-    const valor = parseFloat(rascunhoCompraAmericanas.valor);
-    if (!rascunhoCompraAmericanas.nome.trim() || !rascunhoCompraAmericanas.compra.trim() || !rascunhoCompraAmericanas.data || !(valor > 0)) return;
-    setComprasAmericanas((prev) =>
-      prev.map((c) =>
-        c.id === editandoCompraAmericanasId
-          ? { ...c, nome: rascunhoCompraAmericanas.nome.trim(), compra: rascunhoCompraAmericanas.compra.trim(), valor, data: rascunhoCompraAmericanas.data }
-          : c
-      )
-    );
-    setEditandoCompraAmericanasId(null);
-    setRascunhoCompraAmericanas(null);
-  };
-
-  const excluirCompraAmericanas = (id) => setComprasAmericanas((prev) => prev.filter((c) => c.id !== id));
 
   // ---------- relatório em PDF (compartilhado entre os cartões, para não duplicar na impressão) ----------
   const [relatorio, setRelatorio] = useState(null);
@@ -346,8 +278,9 @@ export default function MeuCaixaApp() {
     }, 50);
   };
 
-  const acento = aba === "despesas" ? COR.ouro : aba === "cartao" ? COR.roxo : COR.americanas;
-  const acentoClaro = aba === "despesas" ? COR.ouroClaro : aba === "cartao" ? COR.roxoClaro : COR.americanasClaro;
+  const cartaoAtivo = cartoes.find((c) => `cartao-${c.id}` === aba);
+  const acento = aba === "despesas" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
+  const acentoClaro = aba === "despesas" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
   return (
     <div
@@ -369,41 +302,64 @@ export default function MeuCaixaApp() {
       {/* cabeçalho */}
       <header style={{ background: COR.tinta }} className="px-5 pt-7 pb-0 oculta-impressao">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-2 mb-6">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: COR.ouro }}
-            >
-              <Wallet size={18} color={COR.tinta} strokeWidth={2.5} />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: COR.ouro }}>
+                <Wallet size={18} color={COR.tinta} strokeWidth={2.5} />
+              </div>
+              <h1 className="fonte-display text-2xl" style={{ color: COR.papel }}>Meu Caixa</h1>
             </div>
-            <h1 className="fonte-display text-2xl" style={{ color: COR.papel }}>
-              Meu Caixa
-            </h1>
+            <button onClick={exportarDados} className="p-2 rounded-full" style={{ color: "#9AA1B4" }} title="Exportar dados (backup)">
+              <Download size={18} />
+            </button>
           </div>
 
-          <nav className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {[
-              { id: "despesas", label: "Despesas", icon: Wallet },
-              { id: "cartao", label: "Cartão Nubank", icon: CreditCard },
-              { id: "americanas", label: "Cartão Americanas", icon: CreditCard },
-            ].map(({ id, label, icon: Icon }) => {
-              const ativo = aba === id;
+          <nav className="flex gap-1 items-center overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setAba("despesas")}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
+              style={{ background: aba === "despesas" ? COR.papel : "transparent", color: aba === "despesas" ? COR.tinta : "#9AA1B4" }}
+            >
+              <Wallet size={15} /> Despesas
+            </button>
+            {cartoes.map((c) => {
+              const ativo = aba === `cartao-${c.id}`;
               return (
                 <button
-                  key={id}
-                  onClick={() => setAba(id)}
+                  key={c.id}
+                  onClick={() => setAba(`cartao-${c.id}`)}
                   className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
-                  style={{
-                    background: ativo ? COR.papel : "transparent",
-                    color: ativo ? COR.tinta : "#9AA1B4",
-                  }}
+                  style={{ background: ativo ? COR.papel : "transparent", color: ativo ? COR.tinta : "#9AA1B4" }}
                 >
-                  <Icon size={15} />
-                  {label}
+                  <CreditCard size={15} /> {c.nome}
                 </button>
               );
             })}
+            <button
+              onClick={() => setMostrarAddCartao((v) => !v)}
+              className="shrink-0 p-2 rounded-full ml-1"
+              style={{ color: "#9AA1B4" }}
+              title="Adicionar cartão"
+            >
+              <Plus size={16} />
+            </button>
           </nav>
+
+          {mostrarAddCartao && (
+            <div className="flex gap-2 pb-3 pt-2">
+              <input
+                value={nomeNovoCartao}
+                onChange={(e) => setNomeNovoCartao(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") adicionarCartao(); }}
+                placeholder="Nome do novo cartão (ex: Cartão Inter)"
+                className="flex-1 h-9 px-2.5 rounded-md border text-sm outline-none box-border"
+                style={{ borderColor: COR.linha }}
+              />
+              <button onClick={adicionarCartao} className="px-3 rounded-md text-sm font-semibold text-white" style={{ background: COR.ouro }}>
+                Adicionar
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -423,68 +379,27 @@ export default function MeuCaixaApp() {
         >
           <div className="max-w-2xl mx-auto px-5 py-6 w-full shrink-0 oculta-impressao">
             <DespesasTab
-              chaves={chavesDespesas}
-              despesasPorMes={despesasPorMes}
-              fontesCartao={[
-                { label: "Cartão Nubank", totalPorMes: totalJeffersonPorMes, cor: COR.roxo, corClara: COR.roxoClaro },
-                { label: "Cartão Americanas", totalPorMes: totalJeffersonAmericanasPorMes, cor: COR.americanas, corClara: COR.americanasClaro },
-              ]}
-              mostrarForm={mostrarFormDespesa}
-              setMostrarForm={setMostrarFormDespesa}
-              nova={novaDespesa}
-              setNova={setNovaDespesa}
-              adicionar={adicionarDespesa}
-              editandoId={editandoDespesaId}
-              rascunho={rascunhoDespesa}
-              setRascunho={setRascunhoDespesa}
-              iniciarEdicao={iniciarEdicaoDespesa}
-              salvarEdicao={salvarEdicaoDespesa}
-              cancelarEdicao={() => { setEditandoDespesaId(null); setRascunhoDespesa(null); }}
-              excluir={excluirDespesa}
+              despesas={despesas}
+              onAtualizarDespesas={setDespesas}
+              cartoes={cartoes}
+              pessoasAutomaticas={pessoasAutomaticas}
+              adicionarPessoaAutomatica={adicionarPessoaAutomatica}
+              removerPessoaAutomatica={removerPessoaAutomatica}
             />
           </div>
-          <div className="max-w-2xl mx-auto px-5 py-6 w-full shrink-0">
-            <CartaoTab
-              nomeCartao="Cartão Nubank"
-              corPrincipal={COR.roxo}
-              corClara={COR.roxoClaro}
-              compras={compras}
-              onGerarPdf={gerarRelatorio}
-              mostrarForm={mostrarFormCompra}
-              setMostrarForm={setMostrarFormCompra}
-              nova={novaCompra}
-              setNova={setNovaCompra}
-              adicionar={adicionarCompra}
-              editandoId={editandoCompraId}
-              rascunho={rascunhoCompra}
-              setRascunho={setRascunhoCompra}
-              iniciarEdicao={iniciarEdicaoCompra}
-              salvarEdicao={salvarEdicaoCompra}
-              cancelarEdicao={() => { setEditandoCompraId(null); setRascunhoCompra(null); }}
-              excluir={excluirCompra}
-            />
-          </div>
-          <div className="max-w-2xl mx-auto px-5 py-6 w-full shrink-0">
-            <CartaoTab
-              nomeCartao="Cartão Americanas"
-              corPrincipal={COR.americanas}
-              corClara={COR.americanasClaro}
-              compras={comprasAmericanas}
-              onGerarPdf={gerarRelatorio}
-              mostrarForm={mostrarFormCompraAmericanas}
-              setMostrarForm={setMostrarFormCompraAmericanas}
-              nova={novaCompraAmericanas}
-              setNova={setNovaCompraAmericanas}
-              adicionar={adicionarCompraAmericanas}
-              editandoId={editandoCompraAmericanasId}
-              rascunho={rascunhoCompraAmericanas}
-              setRascunho={setRascunhoCompraAmericanas}
-              iniciarEdicao={iniciarEdicaoCompraAmericanas}
-              salvarEdicao={salvarEdicaoCompraAmericanas}
-              cancelarEdicao={() => { setEditandoCompraAmericanasId(null); setRascunhoCompraAmericanas(null); }}
-              excluir={excluirCompraAmericanas}
-            />
-          </div>
+          {cartoes.map((cartao) => (
+            <div key={cartao.id} className="max-w-2xl mx-auto px-5 py-6 w-full shrink-0">
+              <CartaoTab
+                cartao={cartao}
+                onAtualizarCompras={(novasCompras) =>
+                  setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
+                }
+                onGerarPdf={gerarRelatorio}
+                onExcluirCartao={excluirCartao}
+                pessoasAutomaticas={pessoasAutomaticas}
+              />
+            </div>
+          ))}
         </div>
       </main>
 
@@ -533,26 +448,95 @@ export default function MeuCaixaApp() {
 }
 
 // ===================== ABA DESPESAS =====================
-function DespesasTab(props) {
-  const {
-    chaves, despesasPorMes, fontesCartao,
-    mostrarForm, setMostrarForm, nova, setNova, adicionar,
-    editandoId, rascunho, setRascunho, iniciarEdicao, salvarEdicao, cancelarEdicao, excluir,
-  } = props;
-
+function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, adicionarPessoaAutomatica, removerPessoaAutomatica }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nova, setNova] = useState({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
+  const [editandoId, setEditandoId] = useState(null);
+  const [rascunho, setRascunho] = useState(null);
+  const [novaPessoa, setNovaPessoa] = useState("");
+
+  const despesasPorMes = useMemo(() => {
+    const grupos = {};
+    for (const d of despesas) {
+      const chave = chaveDoMes(d.vencimento);
+      (grupos[chave] ||= []).push(d);
+    }
+    return grupos;
+  }, [despesas]);
+
+  const cartoesComAgrupamento = useMemo(() => cartoes.map((c) => {
+    const porMes = {};
+    for (const compra of c.compras) {
+      const chave = chaveDoMes(compra.data);
+      (porMes[chave] ||= []).push(compra);
+    }
+    return { ...c, porMes };
+  }), [cartoes]);
+
+  const fontesCartao = useMemo(() => cartoesComAgrupamento.map((c) => ({
+    label: c.nome,
+    cor: c.cor,
+    corClara: c.corClara,
+    totalPorMes: (chave) => totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas),
+  })), [cartoesComAgrupamento, pessoasAutomaticas]);
+
+  const chaves = useMemo(() => {
+    const conjunto = new Set(Object.keys(despesasPorMes));
+    for (const c of cartoesComAgrupamento) {
+      for (const chave of Object.keys(c.porMes)) {
+        if (totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas) > 0) conjunto.add(chave);
+      }
+    }
+    return [...conjunto].sort();
+  }, [despesasPorMes, cartoesComAgrupamento, pessoasAutomaticas]);
+
   const meses = useMemo(() => preencherIntervaloMeses(chaves), [chaves]);
 
   const linhas = despesasPorMes[mesSelecionado] || [];
   const totaisCartoes = fontesCartao.map((f) => ({ ...f, total: f.totalPorMes(mesSelecionado) }));
   const somaCartoes = totaisCartoes.reduce((s, f) => s + f.total, 0);
-  const totalMes = linhas.reduce((s, d) => s + d.valor, 0) + somaCartoes;
+  const totalDespesasMes = linhas.reduce((s, d) => s + d.valor, 0);
+  const totalMes = totalDespesasMes + somaCartoes;
+  const totalPago = linhas.filter((d) => d.paga).reduce((s, d) => s + d.valor, 0);
+  const totalPendente = totalDespesasMes - totalPago;
 
-  const handleAdicionar = () => {
-    const chave = chaveDoMes(nova.vencimento);
-    adicionar();
-    if (chave) setMesSelecionado(chave);
+  const dadosGrafico = useMemo(() => chaves.slice(-12).map((chave) => {
+    const totalD = (despesasPorMes[chave] || []).reduce((s, d) => s + d.valor, 0);
+    const totalC = fontesCartao.reduce((s, f) => s + f.totalPorMes(chave), 0);
+    const [, m] = chave.split("-");
+    return { mesRotulo: MESES[parseInt(m, 10) - 1].slice(0, 3), total: totalD + totalC };
+  }), [chaves, despesasPorMes, fontesCartao]);
+
+  const adicionar = () => {
+    const valor = parseFloat(nova.valor);
+    if (!nova.descricao.trim() || !nova.vencimento || !(valor > 0)) return;
+    const novaDespesa = { id: uid(), descricao: nova.descricao.trim(), valor, vencimento: nova.vencimento, categoria: nova.categoria || "Outros", paga: false };
+    onAtualizarDespesas([...despesas, novaDespesa]);
+    setNova({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
+    setMostrarForm(false);
+    setMesSelecionado(chaveDoMes(novaDespesa.vencimento));
   };
+
+  const iniciarEdicao = (d) => { setEditandoId(d.id); setRascunho({ ...d, valor: String(d.valor) }); };
+
+  const salvarEdicao = () => {
+    const valor = parseFloat(rascunho.valor);
+    if (!rascunho.descricao.trim() || !rascunho.vencimento || !(valor > 0)) return;
+    onAtualizarDespesas(despesas.map((d) =>
+      d.id === editandoId
+        ? { ...d, descricao: rascunho.descricao.trim(), valor, vencimento: rascunho.vencimento, categoria: rascunho.categoria }
+        : d
+    ));
+    setEditandoId(null);
+    setRascunho(null);
+  };
+
+  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
+  const excluir = (id) => onAtualizarDespesas(despesas.filter((d) => d.id !== id));
+  const togglePaga = (id) => onAtualizarDespesas(despesas.map((d) => (d.id === id ? { ...d, paga: !d.paga } : d)));
+
+  const confirmarAdicionarPessoa = () => { adicionarPessoaAutomatica(novaPessoa); setNovaPessoa(""); };
 
   return (
     <div className="flex flex-col gap-6">
@@ -570,9 +554,40 @@ function DespesasTab(props) {
         <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>
           Total de despesas — {rotuloDoMes(mesSelecionado)}
         </p>
-        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>
-          {fmt(totalMes)}
+        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalMes)}</p>
+        {linhas.length > 0 && (
+          <p className="text-xs mt-1" style={{ color: "#9AA1B4" }}>
+            Pago: <span className="fonte-mono">{fmt(totalPago)}</span> · Pendente: <span className="fonte-mono">{fmt(totalPendente)}</span>
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg p-3 flex flex-col gap-2" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+        <p className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: COR.tintaSuave }}>
+          Pessoas com soma automática nos cartões
         </p>
+        <div className="flex flex-wrap gap-1.5">
+          {pessoasAutomaticas.length === 0 && (
+            <span className="text-xs" style={{ color: COR.tintaSuave }}>Nenhuma pessoa configurada.</span>
+          )}
+          {pessoasAutomaticas.map((p) => (
+            <span key={p} className="flex items-center gap-1 text-xs font-medium pl-2 pr-1 py-1 rounded-full" style={{ background: COR.papelEscuro, color: COR.tinta }}>
+              {p}
+              <button onClick={() => removerPessoaAutomatica(p)} style={{ color: COR.vermelho }}><X size={11} /></button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={novaPessoa}
+            onChange={(e) => setNovaPessoa(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") confirmarAdicionarPessoa(); }}
+            placeholder="Adicionar pessoa..."
+            className={inputBase + " flex-1"}
+            style={{ borderColor: COR.linha }}
+          />
+          <button onClick={confirmarAdicionarPessoa} className="px-4 rounded-md text-sm font-semibold text-white" style={{ background: COR.ouro }}>+</button>
+        </div>
       </div>
 
       <button
@@ -593,6 +608,11 @@ function DespesasTab(props) {
               value={nova.descricao}
               onChange={(e) => setNova({ ...nova, descricao: e.target.value })}
             />
+          </Campo>
+          <Campo label="Categoria">
+            <select className={inputBase} style={{ borderColor: COR.linha }} value={nova.categoria} onChange={(e) => setNova({ ...nova, categoria: e.target.value })}>
+              {CATEGORIAS.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
           </Campo>
           <Campo label="Valor (R$)">
             <input
@@ -617,7 +637,7 @@ function DespesasTab(props) {
               Cancelar
             </button>
             <button
-              onClick={handleAdicionar}
+              onClick={adicionar}
               className="px-3 py-1.5 text-sm font-semibold rounded-md text-white"
               style={{ background: COR.ouro }}
             >
@@ -644,37 +664,56 @@ function DespesasTab(props) {
                     value={rascunho.descricao}
                     onChange={(e) => setRascunho({ ...rascunho, descricao: e.target.value })}
                   />
-                  <div className="flex gap-2">
-                    <input
-                      className={inputBase + " flex-1"} style={{ borderColor: COR.linha }}
-                      type="number" step="0.01" min="0"
-                      value={rascunho.valor}
-                      onChange={(e) => setRascunho({ ...rascunho, valor: e.target.value })}
-                    />
-                    <input
-                      className={inputBase + " flex-1"} style={{ borderColor: COR.linha }}
-                      type="date"
-                      value={rascunho.vencimento}
-                      onChange={(e) => setRascunho({ ...rascunho, vencimento: e.target.value })}
-                    />
-                  </div>
+                  <select className={inputBase} style={{ borderColor: COR.linha }} value={rascunho.categoria} onChange={(e) => setRascunho({ ...rascunho, categoria: e.target.value })}>
+                    {CATEGORIAS.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    type="number" step="0.01" min="0"
+                    value={rascunho.valor}
+                    onChange={(e) => setRascunho({ ...rascunho, valor: e.target.value })}
+                  />
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    type="date"
+                    value={rascunho.vencimento}
+                    onChange={(e) => setRascunho({ ...rascunho, vencimento: e.target.value })}
+                  />
                   <div className="flex gap-2 justify-end">
                     <button onClick={cancelarEdicao} className="p-1.5 rounded-md" style={{ color: COR.tintaSuave }}><X size={16} /></button>
                     <button onClick={salvarEdicao} className="p-1.5 rounded-md text-white" style={{ background: COR.ouro }}><Check size={16} /></button>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between px-3 py-2.5 group">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{d.descricao}</p>
-                    <p className="text-xs" style={{ color: COR.tintaSuave }}>
-                      Vence em {new Date(d.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                <div className="flex items-start gap-3 px-3 py-2.5">
+                  <button onClick={() => togglePaga(d.id)} className="mt-0.5 shrink-0" title={d.paga ? "Marcar como pendente" : "Marcar como paga"}>
+                    {d.paga ? <CheckCircle2 size={18} color={COR.verde} /> : <Circle size={18} color={COR.tintaSuave} />}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-sm font-medium truncate"
+                      style={{ textDecoration: d.paga ? "line-through" : "none", color: d.paga ? COR.tintaSuave : COR.tinta }}
+                    >
+                      {d.descricao}
                     </p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: corCategoria(d.categoria) + "22", color: corCategoria(d.categoria) }}>
+                        {d.categoria}
+                      </span>
+                      <span className="text-xs" style={{ color: COR.tintaSuave }}>
+                        Vence em {new Date(d.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </span>
+                      {!d.paga && d.vencimento < hojeISO() && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#F8D9DF", color: COR.vermelho }}>
+                          Atrasada
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="fonte-mono text-sm font-semibold">{fmt(d.valor)}</span>
                     <button onClick={() => iniciarEdicao(d)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
-                    <button onClick={() => excluir(d.id)} style={{ color: COR.vermelho }}><Trash2 size={14} /></button>
+                    <BotaoExcluirConfirmar onConfirmar={() => excluir(d.id)} />
                   </div>
                 </div>
               )}
@@ -690,7 +729,7 @@ function DespesasTab(props) {
               <div className="flex items-center gap-1.5 min-w-0">
                 <ArrowRight size={13} color={f.cor} />
                 <p className="text-sm font-medium truncate" style={{ color: f.cor }}>
-                  {f.label} — Jefferson
+                  {f.label} — soma automática
                 </p>
               </div>
               <span className="fonte-mono text-sm font-semibold" style={{ color: f.cor }}>{fmt(f.total)}</span>
@@ -698,20 +737,38 @@ function DespesasTab(props) {
           ))}
         </div>
       )}
+
+      {dadosGrafico.length > 0 && (
+        <div className="rounded-lg p-4" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+          <p className="text-sm font-semibold mb-3" style={{ color: COR.tinta }}>Evolução mensal</p>
+          <div style={{ width: "100%", height: 200 }}>
+            <ResponsiveContainer>
+              <BarChart data={dadosGrafico}>
+                <CartesianGrid strokeDasharray="3 3" stroke={COR.linha} />
+                <XAxis dataKey="mesRotulo" tick={{ fontSize: 11, fill: COR.tintaSuave }} axisLine={{ stroke: COR.linha }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: COR.tintaSuave }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => `R$${v}`} />
+                <Tooltip formatter={(v) => fmt(v)} contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: COR.linha }} />
+                <Bar dataKey="total" fill={COR.ouro} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ===================== ABA DE CARTÃO (reutilizada por Nubank e Americanas) =====================
-function CartaoTab(props) {
-  const {
-    nomeCartao, corPrincipal, corClara, compras, onGerarPdf,
-    mostrarForm, setMostrarForm, nova, setNova, adicionar,
-    editandoId, rascunho, setRascunho, iniciarEdicao, salvarEdicao, cancelarEdicao, excluir,
-  } = props;
+// ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
+function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onExcluirCartao, pessoasAutomaticas }) {
+  const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
 
   const [pessoaFiltro, setPessoaFiltro] = useState("todos");
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
+  const [editandoId, setEditandoId] = useState(null);
+  const [rascunho, setRascunho] = useState(null);
+  const [confirmandoExclusaoCartao, setConfirmandoExclusaoCartao] = useState(false);
 
   const nomesUnicos = useMemo(
     () => [...new Set(compras.map((c) => c.nome))].sort((a, b) => a.localeCompare(b, "pt-BR")),
@@ -736,20 +793,35 @@ function CartaoTab(props) {
   const linhasMes = comprasPorMes[mesSelecionado] || [];
   const totalMes = linhasMes.reduce((s, c) => s + c.valor, 0);
 
-  const handleAdicionar = () => {
-    const chave = chaveDoMes(nova.data);
-    adicionar();
-    if (chave) setMesSelecionado(chave);
+  const adicionar = () => {
+    const valor = parseFloat(nova.valor);
+    if (!nova.nome.trim() || !nova.compra.trim() || !nova.data || !(valor > 0)) return;
+    const novaCompra = { id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: nova.data };
+    onAtualizarCompras([...compras, novaCompra]);
+    setNova({ nome: "", compra: "", valor: "", data: "" });
+    setMostrarForm(false);
+    setMesSelecionado(chaveDoMes(novaCompra.data));
   };
 
+  const iniciarEdicao = (c) => { setEditandoId(c.id); setRascunho({ ...c, valor: String(c.valor) }); };
+
+  const salvarEdicao = () => {
+    const valor = parseFloat(rascunho.valor);
+    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !rascunho.data || !(valor > 0)) return;
+    onAtualizarCompras(compras.map((c) =>
+      c.id === editandoId
+        ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor, data: rascunho.data }
+        : c
+    ));
+    setEditandoId(null);
+    setRascunho(null);
+  };
+
+  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
+  const excluir = (id) => onAtualizarCompras(compras.filter((c) => c.id !== id));
+
   const gerarRelatorioPdf = () => {
-    onGerarPdf({
-      nomeCartao,
-      pessoaFiltro,
-      mesSelecionado,
-      linhas: linhasMes,
-      total: totalMes,
-    });
+    onGerarPdf({ nomeCartao, pessoaFiltro, mesSelecionado, linhas: linhasMes, total: totalMes });
   };
 
   return (
@@ -805,7 +877,7 @@ function CartaoTab(props) {
           <Campo label="Nome de quem comprou">
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
-              placeholder="Ex: Jefferson"
+              placeholder={pessoasAutomaticas[0] ? `Ex: ${pessoasAutomaticas[0]}` : "Nome de quem comprou"}
               value={nova.nome}
               onChange={(e) => setNova({ ...nova, nome: e.target.value })}
             />
@@ -838,7 +910,7 @@ function CartaoTab(props) {
             <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
               Cancelar
             </button>
-            <button onClick={handleAdicionar} className="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style={{ background: corPrincipal }}>
+            <button onClick={adicionar} className="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style={{ background: corPrincipal }}>
               Salvar
             </button>
           </div>
@@ -857,19 +929,17 @@ function CartaoTab(props) {
             <div key={c.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === c.id ? (
                 <div className="p-3 flex flex-col gap-2" style={{ background: COR.papelEscuro }}>
-                  <div className="flex gap-2">
-                    <input
-                      className={inputBase + " flex-1"} style={{ borderColor: COR.linha }}
-                      value={rascunho.nome}
-                      onChange={(e) => setRascunho({ ...rascunho, nome: e.target.value })}
-                    />
-                    <input
-                      className={inputBase + " flex-1"} style={{ borderColor: COR.linha }}
-                      type="date"
-                      value={rascunho.data}
-                      onChange={(e) => setRascunho({ ...rascunho, data: e.target.value })}
-                    />
-                  </div>
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    value={rascunho.nome}
+                    onChange={(e) => setRascunho({ ...rascunho, nome: e.target.value })}
+                  />
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    type="date"
+                    value={rascunho.data}
+                    onChange={(e) => setRascunho({ ...rascunho, data: e.target.value })}
+                  />
                   <input
                     className={inputBase} style={{ borderColor: COR.linha }}
                     value={rascunho.compra}
@@ -892,8 +962,8 @@ function CartaoTab(props) {
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
                       style={{
-                        background: ehJefferson(c.nome) ? corPrincipal : COR.papelEscuro,
-                        color: ehJefferson(c.nome) ? "white" : COR.tintaSuave,
+                        background: ehPessoaAutomatica(c.nome, pessoasAutomaticas) ? corPrincipal : COR.papelEscuro,
+                        color: ehPessoaAutomatica(c.nome, pessoasAutomaticas) ? "white" : COR.tintaSuave,
                       }}
                     >
                       {c.nome}
@@ -908,7 +978,7 @@ function CartaoTab(props) {
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="fonte-mono text-sm font-semibold">{fmt(c.valor)}</span>
                     <button onClick={() => iniciarEdicao(c)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
-                    <button onClick={() => excluir(c.id)} style={{ color: COR.vermelho }}><Trash2 size={14} /></button>
+                    <BotaoExcluirConfirmar onConfirmar={() => excluir(c.id)} />
                   </div>
                 </div>
               )}
@@ -916,6 +986,28 @@ function CartaoTab(props) {
           ))}
         </div>
       )}
+
+      <div className="pt-2 oculta-impressao">
+        {confirmandoExclusaoCartao ? (
+          <div className="flex items-center justify-between rounded-md px-3 py-2" style={{ background: "#F8D9DF" }}>
+            <span className="text-xs font-medium" style={{ color: COR.vermelho }}>
+              Excluir {nomeCartao} e todas as compras dele?
+            </span>
+            <div className="flex gap-2">
+              <button onClick={() => onExcluirCartao(cartao.id)} className="text-xs font-semibold px-2 py-1 rounded" style={{ background: COR.vermelho, color: "white" }}>
+                Excluir
+              </button>
+              <button onClick={() => setConfirmandoExclusaoCartao(false)} className="text-xs font-semibold px-2 py-1 rounded" style={{ color: COR.tintaSuave }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmandoExclusaoCartao(true)} className="w-full text-center text-xs font-medium py-1" style={{ color: COR.tintaSuave }}>
+            Excluir este cartão
+          </button>
+        )}
+      </div>
     </div>
   );
 }
