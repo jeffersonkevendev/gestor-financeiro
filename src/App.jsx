@@ -1,10 +1,34 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown } from "lucide-react";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
+
+// Guarda o estado no localStorage do navegador quando disponível.
+// Em ambientes sem acesso (ex: prévia sandboxed do Claude) cai de volta pro comportamento normal em memória.
+function useLocalStorageState(chave, valorInicial) {
+  const [valor, setValor] = useState(() => {
+    try {
+      const salvo = window.localStorage.getItem(chave);
+      return salvo !== null ? JSON.parse(salvo) : valorInicial;
+    } catch {
+      return valorInicial;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(chave, JSON.stringify(valor));
+    } catch {
+      // sem acesso a localStorage neste ambiente — os dados continuam funcionando só em memória
+    }
+  }, [chave, valor]);
+
+  return [valor, setValor];
+}
+
 
 const COR = {
   papel: "#F3EFE2",
@@ -104,7 +128,7 @@ const inputBase =
   "box-border h-10 px-2.5 rounded-md border bg-white outline-none text-sm focus:ring-2";
 
 export default function MeuCaixaApp() {
-  const [aba, setAba] = useState("despesas");
+  const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
   const abas = ["despesas", "cartao", "americanas"];
   const indiceAba = abas.indexOf(aba);
 
@@ -142,21 +166,21 @@ export default function MeuCaixaApp() {
   };
 
   // ---------- despesas ----------
-  const [despesas, setDespesas] = useState([]);
+  const [despesas, setDespesas] = useLocalStorageState("meu-caixa:despesas", []);
   const [novaDespesa, setNovaDespesa] = useState({ descricao: "", valor: "", vencimento: "" });
   const [mostrarFormDespesa, setMostrarFormDespesa] = useState(false);
   const [editandoDespesaId, setEditandoDespesaId] = useState(null);
   const [rascunhoDespesa, setRascunhoDespesa] = useState(null);
 
   // ---------- cartão nubank ----------
-  const [compras, setCompras] = useState([]);
+  const [compras, setCompras] = useLocalStorageState("meu-caixa:compras-nubank", []);
   const [novaCompra, setNovaCompra] = useState({ nome: "", compra: "", valor: "", data: "" });
   const [mostrarFormCompra, setMostrarFormCompra] = useState(false);
   const [editandoCompraId, setEditandoCompraId] = useState(null);
   const [rascunhoCompra, setRascunhoCompra] = useState(null);
 
   // ---------- cartão americanas ----------
-  const [comprasAmericanas, setComprasAmericanas] = useState([]);
+  const [comprasAmericanas, setComprasAmericanas] = useLocalStorageState("meu-caixa:compras-americanas", []);
   const [novaCompraAmericanas, setNovaCompraAmericanas] = useState({ nome: "", compra: "", valor: "", data: "" });
   const [mostrarFormCompraAmericanas, setMostrarFormCompraAmericanas] = useState(false);
   const [editandoCompraAmericanasId, setEditandoCompraAmericanasId] = useState(null);
