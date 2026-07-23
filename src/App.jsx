@@ -242,6 +242,13 @@ export default function MeuCaixaApp() {
     setAba((atual) => (atual === `cartao-${id}` ? "despesas" : atual));
   };
 
+  const [cartaoParaExcluir, setCartaoParaExcluir] = useState(null);
+  const confirmarExclusaoCartao = () => {
+    if (!cartaoParaExcluir) return;
+    excluirCartao(cartaoParaExcluir.id);
+    setCartaoParaExcluir(null);
+  };
+
   // ---------- pessoas com soma automática ----------
   const adicionarPessoaAutomatica = (nome) => {
     const limpo = nome.trim();
@@ -325,14 +332,27 @@ export default function MeuCaixaApp() {
             {cartoes.map((c) => {
               const ativo = aba === `cartao-${c.id}`;
               return (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => setAba(`cartao-${c.id}`)}
-                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
-                  style={{ background: ativo ? COR.papel : "transparent", color: ativo ? COR.tinta : "#9AA1B4" }}
+                  className="flex items-center shrink-0 rounded-t-lg transition-colors"
+                  style={{ background: ativo ? COR.papel : "transparent" }}
                 >
-                  <CreditCard size={15} /> {c.nome}
-                </button>
+                  <button
+                    onClick={() => setAba(`cartao-${c.id}`)}
+                    className="flex items-center gap-1.5 pl-4 pr-1.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                    style={{ color: ativo ? COR.tinta : "#9AA1B4" }}
+                  >
+                    <CreditCard size={15} /> {c.nome}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setCartaoParaExcluir(c); }}
+                    className="pr-3 pl-0.5 py-2.5"
+                    style={{ color: ativo ? COR.tintaSuave : "#6b7280" }}
+                    title={`Excluir ${c.nome}`}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               );
             })}
             <button
@@ -395,13 +415,39 @@ export default function MeuCaixaApp() {
                   setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
                 }
                 onGerarPdf={gerarRelatorio}
-                onExcluirCartao={excluirCartao}
+                onPedirExclusao={() => setCartaoParaExcluir(cartao)}
                 pessoasAutomaticas={pessoasAutomaticas}
               />
             </div>
           ))}
         </div>
       </main>
+
+      {/* modal de confirmação — excluir cartão */}
+      {cartaoParaExcluir && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-5 oculta-impressao"
+          style={{ background: "rgba(28,35,51,0.6)" }}
+          onClick={() => setCartaoParaExcluir(null)}
+        >
+          <div className="rounded-lg p-5 max-w-sm w-full" style={{ background: "white" }} onClick={(e) => e.stopPropagation()}>
+            <p className="fonte-display text-lg mb-2" style={{ color: COR.tinta }}>
+              Excluir {cartaoParaExcluir.nome}?
+            </p>
+            <p className="text-sm mb-5" style={{ color: COR.tintaSuave }}>
+              Isso vai apagar permanentemente {cartaoParaExcluir.compras.length === 1 ? "a compra registrada" : "as compras registradas"} nesse cartão. Essa ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setCartaoParaExcluir(null)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
+                Cancelar
+              </button>
+              <button onClick={confirmarExclusaoCartao} className="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style={{ background: COR.vermelho }}>
+                Excluir cartão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* área exclusiva de impressão / PDF — única para qualquer cartão, evita duplicar relatórios */}
       {relatorio && (
@@ -759,7 +805,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
 }
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
-function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onExcluirCartao, pessoasAutomaticas }) {
+function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pessoasAutomaticas }) {
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
 
   const [pessoaFiltro, setPessoaFiltro] = useState("todos");
@@ -768,7 +814,6 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onExcluirCartao, pe
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
-  const [confirmandoExclusaoCartao, setConfirmandoExclusaoCartao] = useState(false);
 
   const nomesUnicos = useMemo(
     () => [...new Set(compras.map((c) => c.nome))].sort((a, b) => a.localeCompare(b, "pt-BR")),
@@ -924,7 +969,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onExcluirCartao, pe
       )}
 
       {linhasMes.length > 0 && (
-        <div className="rounded-lg overflow-hidden oculta-impressao" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-lg oculta-impressao overflow-y-auto max-h-96" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
           {linhasMes.map((c, i) => (
             <div key={c.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === c.id ? (
@@ -988,25 +1033,9 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onExcluirCartao, pe
       )}
 
       <div className="pt-2 oculta-impressao">
-        {confirmandoExclusaoCartao ? (
-          <div className="flex items-center justify-between rounded-md px-3 py-2" style={{ background: "#F8D9DF" }}>
-            <span className="text-xs font-medium" style={{ color: COR.vermelho }}>
-              Excluir {nomeCartao} e todas as compras dele?
-            </span>
-            <div className="flex gap-2">
-              <button onClick={() => onExcluirCartao(cartao.id)} className="text-xs font-semibold px-2 py-1 rounded" style={{ background: COR.vermelho, color: "white" }}>
-                Excluir
-              </button>
-              <button onClick={() => setConfirmandoExclusaoCartao(false)} className="text-xs font-semibold px-2 py-1 rounded" style={{ color: COR.tintaSuave }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setConfirmandoExclusaoCartao(true)} className="w-full text-center text-xs font-medium py-1" style={{ color: COR.tintaSuave }}>
-            Excluir este cartão
-          </button>
-        )}
+        <button onClick={onPedirExclusao} className="w-full text-center text-xs font-medium py-1" style={{ color: COR.tintaSuave }}>
+          Excluir este cartão
+        </button>
       </div>
     </div>
   );
