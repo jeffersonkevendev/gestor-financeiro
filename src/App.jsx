@@ -203,11 +203,11 @@ function TelaLogin() {
         .fonte-display { font-family: 'Fraunces', serif; }
       `}</style>
 
-      {/* manchas de cor desfocadas ao fundo */}
-      <div className="absolute rounded-full blur-3xl" style={{ width: 380, height: 380, top: -80, left: -100, background: "#7A2E8C", opacity: 0.7 }} />
-      <div className="absolute rounded-full blur-3xl" style={{ width: 420, height: 420, bottom: -140, right: -120, background: "#2A3E8C", opacity: 0.65 }} />
-      <div className="absolute rounded-full blur-3xl" style={{ width: 320, height: 320, bottom: 40, left: -80, background: "#8C2E45", opacity: 0.55 }} />
-      <div className="absolute rounded-full blur-3xl" style={{ width: 300, height: 300, top: 60, right: -60, background: "#B8891F", opacity: 0.35 }} />
+      {/* manchas de cor desfocadas ao fundo — usando a paleta do próprio app */}
+      <div className="absolute rounded-full blur-3xl" style={{ width: 380, height: 380, top: -80, left: -100, background: COR.ouro, opacity: 0.55 }} />
+      <div className="absolute rounded-full blur-3xl" style={{ width: 420, height: 420, bottom: -140, right: -120, background: COR.tintaSuave, opacity: 0.6 }} />
+      <div className="absolute rounded-full blur-3xl" style={{ width: 320, height: 320, bottom: 40, left: -80, background: COR.verde, opacity: 0.4 }} />
+      <div className="absolute rounded-full blur-3xl" style={{ width: 300, height: 300, top: 60, right: -60, background: COR.ouroClaro, opacity: 0.3 }} />
 
       {/* cartão de vidro fosco */}
       <div
