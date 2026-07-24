@@ -1,12 +1,30 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
-  CheckCircle2, Circle, Download, LogOut,
+  CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import {
+  onAuthStateChanged, signInWithPopup, signOut,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail,
+} from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "./firebase";
+
+const mensagemErroAuth = (codigo) => {
+  const mapa = {
+    "auth/invalid-email": "E-mail inválido.",
+    "auth/user-disabled": "Essa conta foi desativada.",
+    "auth/user-not-found": "Não encontramos uma conta com esse e-mail.",
+    "auth/wrong-password": "Senha incorreta.",
+    "auth/invalid-credential": "E-mail ou senha incorretos.",
+    "auth/email-already-in-use": "Já existe uma conta com esse e-mail.",
+    "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
+    "auth/too-many-requests": "Muitas tentativas. Tente novamente em instantes.",
+    "auth/missing-password": "Digite sua senha.",
+  };
+  return mapa[codigo] || "Algo deu errado. Tente novamente.";
+};
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -181,55 +199,164 @@ function TelaCarregando() {
 
 // -------- tela de login --------
 function TelaLogin() {
-  const [entrando, setEntrando] = useState(false);
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [mensagem, setMensagem] = useState("");
+
+  const validar = () => {
+    if (!email.trim() || !senha.trim()) {
+      setErro("Preencha e-mail e senha.");
+      return false;
+    }
+    return true;
+  };
+
+  const entrar = async () => {
+    setErro(""); setMensagem("");
+    if (!validar()) return;
+    setCarregando(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), senha);
+    } catch (e) {
+      setErro(mensagemErroAuth(e.code));
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const criarConta = async () => {
+    setErro(""); setMensagem("");
+    if (!validar()) return;
+    setCarregando(true);
+    try {
+      await createUserWithEmailAndPassword(auth, email.trim(), senha);
+    } catch (e) {
+      setErro(mensagemErroAuth(e.code));
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   const entrarComGoogle = async () => {
-    setErro("");
-    setEntrando(true);
+    setErro(""); setMensagem("");
+    setCarregando(true);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch {
       setErro("Não foi possível entrar. Tente novamente.");
     } finally {
-      setEntrando(false);
+      setCarregando(false);
     }
   };
 
+  const recuperarSenha = async () => {
+    setErro(""); setMensagem("");
+    if (!email.trim()) {
+      setErro("Digite seu e-mail acima pra recuperar a senha.");
+      return;
+    }
+    setCarregando(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setMensagem("Enviamos um link de recuperação para o seu e-mail.");
+    } catch (e) {
+      setErro(mensagemErroAuth(e.code));
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const campoBase = "w-full h-12 pl-11 pr-4 rounded-2xl border text-sm outline-none box-border";
+
   return (
-    <div className="min-h-screen w-full relative flex items-center justify-center px-6 overflow-hidden" style={{ background: "#181425" }}>
+    <div className="min-h-screen w-full" style={{ background: COR.papel }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap');
         .fonte-display { font-family: 'Fraunces', serif; }
+        .campo-login:focus { border-color: ${COR.ouro} !important; box-shadow: 0 0 0 2px ${COR.ouroClaro}; }
       `}</style>
 
-      {/* manchas de cor desfocadas ao fundo — usando a paleta do próprio app */}
-      <div className="absolute rounded-full blur-3xl" style={{ width: 380, height: 380, top: -80, left: -100, background: COR.ouro, opacity: 0.55 }} />
-      <div className="absolute rounded-full blur-3xl" style={{ width: 420, height: 420, bottom: -140, right: -120, background: COR.tintaSuave, opacity: 0.6 }} />
-      <div className="absolute rounded-full blur-3xl" style={{ width: 320, height: 320, bottom: 40, left: -80, background: COR.verde, opacity: 0.4 }} />
-      <div className="absolute rounded-full blur-3xl" style={{ width: 300, height: 300, top: 60, right: -60, background: COR.ouroClaro, opacity: 0.3 }} />
-
-      {/* cartão de vidro fosco */}
-      <div
-        className="relative z-10 w-full flex flex-col items-center backdrop-blur-xl rounded-3xl px-7 py-10"
-        style={{ maxWidth: 340, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" }}
-      >
+      {/* bloco superior navy com borda ondulada */}
+      <div className="relative pt-14 pb-20 px-6 text-center" style={{ background: COR.tinta }}>
         <div
-          className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
-          style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.3)" }}
+          className="w-20 h-20 rounded-full flex items-center justify-center mb-5 mx-auto"
+          style={{ border: `2px solid ${COR.ouro}` }}
         >
-          <Wallet size={32} color="white" strokeWidth={2} />
+          <Wallet size={32} color={COR.ouro} strokeWidth={2} />
         </div>
-        <h1 className="fonte-display text-2xl mb-2" style={{ color: "white" }}>Meu Caixa</h1>
-        <p className="text-sm text-center mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
-          Entre com sua conta Google pra acessar suas despesas e cartões, salvos com segurança na nuvem.
+        <h1 className="fonte-display text-3xl font-bold mb-3" style={{ color: "white" }}>Meu Caixa</h1>
+        <p className="text-sm mx-auto" style={{ color: "rgba(255,255,255,0.7)", maxWidth: 300 }}>
+          Entre com sua conta para acessar suas despesas e cartões, salvos com segurança na nuvem.
         </p>
+        <svg className="absolute left-0 bottom-0 w-full" style={{ height: 36 }} viewBox="0 0 500 60" preserveAspectRatio="none">
+          <path d="M0,30 C150,70 350,-10 500,30 L500,60 L0,60 Z" fill={COR.papel} />
+        </svg>
+      </div>
+
+      {/* formulário */}
+      <div className="px-6 pb-10 pt-2 flex flex-col gap-4 max-w-sm mx-auto">
+        <div className="relative">
+          <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="E-mail"
+            className={campoBase + " campo-login"}
+            style={{ borderColor: COR.linha, background: "white" }}
+          />
+        </div>
+
+        <div className="relative">
+          <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+          <input
+            type={mostrarSenha ? "text" : "password"}
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="Senha"
+            className={campoBase + " campo-login"}
+            style={{ borderColor: COR.linha, background: "white", paddingRight: 40 }}
+          />
+          <button
+            type="button"
+            onClick={() => setMostrarSenha((v) => !v)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2"
+            style={{ color: COR.tintaSuave }}
+          >
+            {mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        </div>
+
+        <button onClick={recuperarSenha} className="text-xs font-medium text-right -mt-2" style={{ color: COR.tintaSuave }}>
+          Esqueci minha senha
+        </button>
+
+        {erro && <p className="text-xs -mt-1" style={{ color: COR.vermelho }}>{erro}</p>}
+        {mensagem && <p className="text-xs -mt-1" style={{ color: COR.verde }}>{mensagem}</p>}
+
+        <button
+          onClick={entrar}
+          disabled={carregando}
+          className="w-full h-12 rounded-2xl font-bold text-sm text-white disabled:opacity-60"
+          style={{ background: COR.ouro }}
+        >
+          {carregando ? "Aguarde..." : "Entrar"}
+        </button>
+
+        <div className="flex items-center gap-3 my-1">
+          <div className="flex-1 h-px" style={{ background: COR.linha }} />
+          <span className="text-xs" style={{ color: COR.tintaSuave }}>ou</span>
+          <div className="flex-1 h-px" style={{ background: COR.linha }} />
+        </div>
 
         <button
           onClick={entrarComGoogle}
-          disabled={entrando}
-          className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full font-semibold text-sm disabled:opacity-60"
-          style={{ background: "rgba(255,255,255,0.95)", color: "#1C2333" }}
+          disabled={carregando}
+          className="w-full h-12 flex items-center justify-center gap-3 rounded-2xl font-semibold text-sm disabled:opacity-60"
+          style={{ background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` }}
         >
           <svg width="18" height="18" viewBox="0 0 48 48">
             <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
@@ -237,9 +364,24 @@ function TelaLogin() {
             <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z" />
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.5l6.3 5.3C41.6 35.4 44 30.2 44 24c0-1.3-.1-2.7-.4-3.5z" />
           </svg>
-          {entrando ? "Entrando..." : "Entrar com Google"}
+          Entrar com Google
         </button>
-        {erro && <p className="text-xs mt-4 text-center" style={{ color: "#F5A3A3" }}>{erro}</p>}
+
+        <button
+          onClick={criarConta}
+          disabled={carregando}
+          className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl font-bold text-sm disabled:opacity-60"
+          style={{ background: "transparent", color: COR.ouro, border: `1.5px solid ${COR.ouro}` }}
+        >
+          <UserPlus size={16} /> Criar conta
+        </button>
+
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <ShieldCheck size={15} color={COR.tintaSuave} />
+          <p className="text-xs text-center" style={{ color: COR.tintaSuave }}>
+            Seus dados ficam protegidos com a segurança do Firebase
+          </p>
+        </div>
       </div>
     </div>
   );
