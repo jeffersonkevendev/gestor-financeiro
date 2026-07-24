@@ -23,8 +23,12 @@ const mensagemErroAuth = (codigo) => {
     "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
     "auth/too-many-requests": "Muitas tentativas. Tente novamente em instantes.",
     "auth/missing-password": "Digite sua senha.",
+    "auth/operation-not-allowed": "Login por e-mail/senha ainda não foi ativado no Firebase.",
+    "auth/configuration-not-found": "Login por e-mail/senha ainda não foi ativado no Firebase.",
+    "auth/network-request-failed": "Falha de conexão. Verifique sua internet.",
+    "permission-denied": "Sem permissão pra salvar seus dados. Confira as regras do Firestore.",
   };
-  return mapa[codigo] || "Algo deu errado. Tente novamente.";
+  return mapa[codigo] || `Algo deu errado${codigo ? ` (${codigo})` : ""}. Tente novamente.`;
 };
 
 const MESES = [
