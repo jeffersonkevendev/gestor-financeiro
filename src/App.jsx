@@ -196,8 +196,20 @@ function useDadosNuvem(uid) {
 // -------- tela de carregamento --------
 function TelaCarregando() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center" style={{ background: COR.papel }}>
-      <p className="text-sm" style={{ color: COR.tintaSuave }}>Carregando...</p>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center" style={{ background: COR.tinta }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&display=swap');
+        .fonte-display { font-family: 'Fraunces', serif; }
+      `}</style>
+      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ border: `2px solid ${COR.ouro}` }}>
+        <Wallet size={26} color={COR.ouro} strokeWidth={2} />
+      </div>
+      <h1 className="fonte-display text-xl mb-5" style={{ color: "white" }}>Meu Caixa</h1>
+      <div
+        className="w-7 h-7 rounded-full animate-spin"
+        style={{ border: "3px solid rgba(255,255,255,0.15)", borderTopColor: COR.ouro }}
+      />
+      <p className="text-xs mt-4" style={{ color: "rgba(255,255,255,0.6)" }}>Carregando...</p>
     </div>
   );
 }
