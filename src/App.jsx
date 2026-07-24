@@ -1,9 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
-  CheckCircle2, Circle, Download,
+  CheckCircle2, Circle, Download, LogOut,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { auth, googleProvider, db } from "./firebase";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -118,6 +121,113 @@ function useLocalStorageState(chave, valorInicial) {
   return [valor, setValor];
 }
 
+const DADOS_PADRAO_NUVEM = { despesas: [], cartoes: CARTOES_PADRAO, pessoasAutomaticas: ["Jefferson"] };
+
+// Guarda despesas, cartões e pessoas automáticas no Firestore, num documento por usuário logado.
+// Funciona como um useState normal (aceita função atualizadora) pra minimizar mudanças no resto do app.
+function useDadosNuvem(uid) {
+  const [dados, setDadosLocal] = useState(DADOS_PADRAO_NUVEM);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    if (!uid) return;
+    setCarregando(true);
+    const ref = doc(db, "usuarios", uid);
+    const cancelar = onSnapshot(
+      ref,
+      async (snap) => {
+        if (snap.exists()) {
+          setDadosLocal({ ...DADOS_PADRAO_NUVEM, ...snap.data() });
+        } else {
+          await setDoc(ref, DADOS_PADRAO_NUVEM);
+          setDadosLocal(DADOS_PADRAO_NUVEM);
+        }
+        setCarregando(false);
+      },
+      () => setCarregando(false)
+    );
+    return cancelar;
+  }, [uid]);
+
+  const criarSetter = (campo) => (valorOuFuncao) => {
+    setDadosLocal((prevDados) => {
+      const valorAtual = prevDados[campo];
+      const novoValor = typeof valorOuFuncao === "function" ? valorOuFuncao(valorAtual) : valorOuFuncao;
+      const novoDados = { ...prevDados, [campo]: novoValor };
+      if (uid) setDoc(doc(db, "usuarios", uid), novoDados).catch(() => {});
+      return novoDados;
+    });
+  };
+
+  return {
+    despesas: dados.despesas,
+    setDespesas: criarSetter("despesas"),
+    cartoes: dados.cartoes,
+    setCartoes: criarSetter("cartoes"),
+    pessoasAutomaticas: dados.pessoasAutomaticas,
+    setPessoasAutomaticas: criarSetter("pessoasAutomaticas"),
+    carregando,
+  };
+}
+
+// -------- tela de carregamento --------
+function TelaCarregando() {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center" style={{ background: COR.papel }}>
+      <p className="text-sm" style={{ color: COR.tintaSuave }}>Carregando...</p>
+    </div>
+  );
+}
+
+// -------- tela de login --------
+function TelaLogin() {
+  const [entrando, setEntrando] = useState(false);
+  const [erro, setErro] = useState("");
+
+  const entrarComGoogle = async () => {
+    setErro("");
+    setEntrando(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch {
+      setErro("Não foi possível entrar. Tente novamente.");
+    } finally {
+      setEntrando(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6" style={{ background: COR.papel }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+        .fonte-display { font-family: 'Fraunces', serif; }
+      `}</style>
+      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: COR.ouro }}>
+        <Wallet size={28} color={COR.tinta} strokeWidth={2.5} />
+      </div>
+      <h1 className="fonte-display text-3xl mb-2" style={{ color: COR.tinta }}>Meu Caixa</h1>
+      <p className="text-sm text-center mb-8" style={{ color: COR.tintaSuave, maxWidth: 280 }}>
+        Entre com sua conta Google pra acessar suas despesas e cartões, salvos com segurança na nuvem.
+      </p>
+      <button
+        onClick={entrarComGoogle}
+        disabled={entrando}
+        className="flex items-center gap-3 px-5 py-3 rounded-md font-semibold text-sm disabled:opacity-60"
+        style={{ background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` }}
+      >
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+          <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z" />
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.5l6.3 5.3C41.6 35.4 44 30.2 44 24c0-1.3-.1-2.7-.4-3.5z" />
+        </svg>
+        {entrando ? "Entrando..." : "Entrar com Google"}
+      </button>
+      {erro && <p className="text-xs mt-3" style={{ color: COR.vermelho }}>{erro}</p>}
+    </div>
+  );
+}
+
 // Carrossel horizontal de meses, no estilo fatura (rolagem lateral, mês ativo em destaque)
 function CarrosselMeses({ meses, mesSelecionado, onSelecionar, corAtiva }) {
   return (
@@ -179,11 +289,23 @@ function BotaoExcluirConfirmar({ onConfirmar }) {
   );
 }
 
-export default function MeuCaixaApp() {
+export default function App() {
+  const [usuario, setUsuario] = useState(undefined); // undefined = verificando, null = deslogado, objeto = logado
+
+  useEffect(() => {
+    const cancelar = onAuthStateChanged(auth, (u) => setUsuario(u));
+    return cancelar;
+  }, []);
+
+  if (usuario === undefined) return <TelaCarregando />;
+  if (usuario === null) return <TelaLogin />;
+  return <MeuCaixaApp usuario={usuario} />;
+}
+
+function MeuCaixaApp({ usuario }) {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
-  const [despesas, setDespesas] = useLocalStorageState("meu-caixa:despesas", []);
-  const [cartoes, setCartoes] = useLocalStorageState("meu-caixa:cartoes", CARTOES_PADRAO);
-  const [pessoasAutomaticas, setPessoasAutomaticas] = useLocalStorageState("meu-caixa:pessoas-automaticas", ["Jefferson"]);
+  const { despesas, setDespesas, cartoes, setCartoes, pessoasAutomaticas, setPessoasAutomaticas, carregando } = useDadosNuvem(usuario.uid);
+  const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
 
   const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
@@ -289,6 +411,8 @@ export default function MeuCaixaApp() {
   const acento = aba === "despesas" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
   const acentoClaro = aba === "despesas" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
+  if (carregando) return <TelaCarregando />;
+
   return (
     <div
       className="min-h-screen w-full"
@@ -316,9 +440,35 @@ export default function MeuCaixaApp() {
               </div>
               <h1 className="fonte-display text-2xl" style={{ color: COR.papel }}>Meu Caixa</h1>
             </div>
-            <button onClick={exportarDados} className="p-2 rounded-full" style={{ color: "#9AA1B4" }} title="Exportar dados (backup)">
-              <Download size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={exportarDados} className="p-2 rounded-full" style={{ color: "#9AA1B4" }} title="Exportar dados (backup)">
+                <Download size={18} />
+              </button>
+              <div className="relative">
+                <button onClick={() => setMostrarMenuUsuario((v) => !v)} className="w-8 h-8 rounded-full overflow-hidden border-2" style={{ borderColor: "#3a4257" }}>
+                  {usuario.photoURL ? (
+                    <img src={usuario.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span className="flex items-center justify-center w-full h-full text-xs font-bold" style={{ background: COR.ouro, color: COR.tinta }}>
+                      {(usuario.displayName || usuario.email || "?").charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </button>
+                {mostrarMenuUsuario && (
+                  <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: "white", minWidth: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                    <p className="text-xs font-semibold truncate" style={{ color: COR.tinta }}>{usuario.displayName || "Usuário"}</p>
+                    <p className="text-[11px] truncate mb-2" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
+                    <button
+                      onClick={() => { setMostrarMenuUsuario(false); signOut(auth); }}
+                      className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1"
+                      style={{ color: COR.vermelho }}
+                    >
+                      <LogOut size={13} /> Sair da conta
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <nav className="flex gap-1 items-center overflow-x-auto" style={{ scrollbarWidth: "none" }}>
