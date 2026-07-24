@@ -197,33 +197,50 @@ function TelaLogin() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center px-6" style={{ background: COR.papel }}>
+    <div className="min-h-screen w-full relative flex items-center justify-center px-6 overflow-hidden" style={{ background: "#181425" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap');
         .fonte-display { font-family: 'Fraunces', serif; }
       `}</style>
-      <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: COR.ouro }}>
-        <Wallet size={28} color={COR.tinta} strokeWidth={2.5} />
-      </div>
-      <h1 className="fonte-display text-3xl mb-2" style={{ color: COR.tinta }}>Meu Caixa</h1>
-      <p className="text-sm text-center mb-8" style={{ color: COR.tintaSuave, maxWidth: 280 }}>
-        Entre com sua conta Google pra acessar suas despesas e cartões, salvos com segurança na nuvem.
-      </p>
-      <button
-        onClick={entrarComGoogle}
-        disabled={entrando}
-        className="flex items-center gap-3 px-5 py-3 rounded-md font-semibold text-sm disabled:opacity-60"
-        style={{ background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` }}
+
+      {/* manchas de cor desfocadas ao fundo */}
+      <div className="absolute rounded-full blur-3xl" style={{ width: 380, height: 380, top: -80, left: -100, background: "#7A2E8C", opacity: 0.7 }} />
+      <div className="absolute rounded-full blur-3xl" style={{ width: 420, height: 420, bottom: -140, right: -120, background: "#2A3E8C", opacity: 0.65 }} />
+      <div className="absolute rounded-full blur-3xl" style={{ width: 320, height: 320, bottom: 40, left: -80, background: "#8C2E45", opacity: 0.55 }} />
+      <div className="absolute rounded-full blur-3xl" style={{ width: 300, height: 300, top: 60, right: -60, background: "#B8891F", opacity: 0.35 }} />
+
+      {/* cartão de vidro fosco */}
+      <div
+        className="relative z-10 w-full flex flex-col items-center backdrop-blur-xl rounded-3xl px-7 py-10"
+        style={{ maxWidth: 340, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", boxShadow: "0 20px 60px rgba(0,0,0,0.45)" }}
       >
-        <svg width="18" height="18" viewBox="0 0 48 48">
-          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
-          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
-          <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z" />
-          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.5l6.3 5.3C41.6 35.4 44 30.2 44 24c0-1.3-.1-2.7-.4-3.5z" />
-        </svg>
-        {entrando ? "Entrando..." : "Entrar com Google"}
-      </button>
-      {erro && <p className="text-xs mt-3" style={{ color: COR.vermelho }}>{erro}</p>}
+        <div
+          className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
+          style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.3)" }}
+        >
+          <Wallet size={32} color="white" strokeWidth={2} />
+        </div>
+        <h1 className="fonte-display text-2xl mb-2" style={{ color: "white" }}>Meu Caixa</h1>
+        <p className="text-sm text-center mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
+          Entre com sua conta Google pra acessar suas despesas e cartões, salvos com segurança na nuvem.
+        </p>
+
+        <button
+          onClick={entrarComGoogle}
+          disabled={entrando}
+          className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-full font-semibold text-sm disabled:opacity-60"
+          style={{ background: "rgba(255,255,255,0.95)", color: "#1C2333" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+            <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z" />
+            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.5l6.3 5.3C41.6 35.4 44 30.2 44 24c0-1.3-.1-2.7-.4-3.5z" />
+          </svg>
+          {entrando ? "Entrando..." : "Entrar com Google"}
+        </button>
+        {erro && <p className="text-xs mt-4 text-center" style={{ color: "#F5A3A3" }}>{erro}</p>}
+      </div>
     </div>
   );
 }
