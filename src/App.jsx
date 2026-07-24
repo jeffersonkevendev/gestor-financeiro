@@ -2,11 +2,12 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
+  ArrowLeft, User, Phone,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   onAuthStateChanged, signInWithPopup, signOut,
-  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile,
 } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "./firebase";
@@ -157,7 +158,7 @@ function useDadosNuvem(uid) {
         if (snap.exists()) {
           setDadosLocal({ ...DADOS_PADRAO_NUVEM, ...snap.data() });
         } else {
-          await setDoc(ref, DADOS_PADRAO_NUVEM);
+          await setDoc(ref, DADOS_PADRAO_NUVEM, { merge: true });
           setDadosLocal(DADOS_PADRAO_NUVEM);
         }
         setCarregando(false);
@@ -199,24 +200,29 @@ function TelaCarregando() {
 
 // -------- tela de login --------
 function TelaLogin() {
+  const [tela, setTela] = useState("login"); // "login" | "cadastro" | "recuperar"
+
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
+
+  const [nomeCompleto, setNomeCompleto] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
+
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
 
-  const validar = () => {
-    if (!email.trim() || !senha.trim()) {
-      setErro("Preencha e-mail e senha.");
-      return false;
-    }
-    return true;
+  const irPara = (novaTela) => {
+    setErro(""); setMensagem("");
+    setTela(novaTela);
   };
 
   const entrar = async () => {
     setErro(""); setMensagem("");
-    if (!validar()) return;
+    if (!email.trim() || !senha.trim()) { setErro("Preencha e-mail e senha."); return; }
     setCarregando(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), senha);
@@ -229,10 +235,21 @@ function TelaLogin() {
 
   const criarConta = async () => {
     setErro(""); setMensagem("");
-    if (!validar()) return;
+    if (!nomeCompleto.trim() || !telefone.trim() || !email.trim() || !senha || !confirmarSenha) {
+      setErro("Preencha todos os campos."); return;
+    }
+    if (senha.length < 6) { setErro("A senha precisa ter pelo menos 6 caracteres."); return; }
+    if (senha !== confirmarSenha) { setErro("As senhas não coincidem."); return; }
+
     setCarregando(true);
     try {
-      await createUserWithEmailAndPassword(auth, email.trim(), senha);
+      const credencial = await createUserWithEmailAndPassword(auth, email.trim(), senha);
+      await updateProfile(credencial.user, { displayName: nomeCompleto.trim() });
+      await setDoc(
+        doc(db, "usuarios", credencial.user.uid),
+        { perfil: { nomeCompleto: nomeCompleto.trim(), telefone: telefone.trim(), email: email.trim() } },
+        { merge: true }
+      );
     } catch (e) {
       setErro(mensagemErroAuth(e.code));
     } finally {
@@ -254,14 +271,11 @@ function TelaLogin() {
 
   const recuperarSenha = async () => {
     setErro(""); setMensagem("");
-    if (!email.trim()) {
-      setErro("Digite seu e-mail acima pra recuperar a senha.");
-      return;
-    }
+    if (!email.trim()) { setErro("Digite seu e-mail."); return; }
     setCarregando(true);
     try {
       await sendPasswordResetEmail(auth, email.trim());
-      setMensagem("Enviamos um link de recuperação para o seu e-mail.");
+      setMensagem("Enviamos um link de recuperação para o seu e-mail. Abra-o pra redefinir sua senha.");
     } catch (e) {
       setErro(mensagemErroAuth(e.code));
     } finally {
@@ -270,6 +284,12 @@ function TelaLogin() {
   };
 
   const campoBase = "w-full h-12 pl-11 pr-4 rounded-2xl border text-sm outline-none box-border";
+
+  const titulos = {
+    login: { titulo: "Meu Caixa", subtitulo: "Entre com sua conta para acessar suas despesas e cartões, salvos com segurança na nuvem." },
+    cadastro: { titulo: "Criar conta", subtitulo: "Preencha seus dados pra começar a usar o Meu Caixa." },
+    recuperar: { titulo: "Recuperar senha", subtitulo: "Informe seu e-mail e enviaremos um link pra você redefinir sua senha." },
+  };
 
   return (
     <div className="min-h-screen w-full" style={{ background: COR.papel }}>
@@ -281,15 +301,24 @@ function TelaLogin() {
 
       {/* bloco superior navy com borda ondulada */}
       <div className="relative pt-14 pb-20 px-6 text-center" style={{ background: COR.tinta }}>
+        {tela !== "login" && (
+          <button
+            onClick={() => irPara("login")}
+            className="absolute left-5 top-6 flex items-center gap-1 text-xs font-medium"
+            style={{ color: "rgba(255,255,255,0.75)" }}
+          >
+            <ArrowLeft size={15} /> Voltar
+          </button>
+        )}
         <div
           className="w-20 h-20 rounded-full flex items-center justify-center mb-5 mx-auto"
           style={{ border: `2px solid ${COR.ouro}` }}
         >
           <Wallet size={32} color={COR.ouro} strokeWidth={2} />
         </div>
-        <h1 className="fonte-display text-3xl font-bold mb-3" style={{ color: "white" }}>Meu Caixa</h1>
+        <h1 className="fonte-display text-3xl font-bold mb-3" style={{ color: "white" }}>{titulos[tela].titulo}</h1>
         <p className="text-sm mx-auto" style={{ color: "rgba(255,255,255,0.7)", maxWidth: 300 }}>
-          Entre com sua conta para acessar suas despesas e cartões, salvos com segurança na nuvem.
+          {titulos[tela].subtitulo}
         </p>
         <svg className="absolute left-0 bottom-0 w-full" style={{ height: 36 }} viewBox="0 0 500 60" preserveAspectRatio="none">
           <path d="M0,30 C150,70 350,-10 500,30 L500,60 L0,60 Z" fill={COR.papel} />
@@ -298,90 +327,147 @@ function TelaLogin() {
 
       {/* formulário */}
       <div className="px-6 pb-10 pt-2 flex flex-col gap-4 max-w-sm mx-auto">
-        <div className="relative">
-          <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="E-mail"
-            className={campoBase + " campo-login"}
-            style={{ borderColor: COR.linha, background: "white" }}
-          />
-        </div>
 
-        <div className="relative">
-          <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
-          <input
-            type={mostrarSenha ? "text" : "password"}
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            placeholder="Senha"
-            className={campoBase + " campo-login"}
-            style={{ borderColor: COR.linha, background: "white", paddingRight: 40 }}
-          />
-          <button
-            type="button"
-            onClick={() => setMostrarSenha((v) => !v)}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2"
-            style={{ color: COR.tintaSuave }}
-          >
-            {mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
-        </div>
+        {tela === "login" && (
+          <>
+            <div className="relative">
+              <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="E-mail" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white" }}
+              />
+            </div>
 
-        <button onClick={recuperarSenha} className="text-xs font-medium text-right -mt-2" style={{ color: COR.tintaSuave }}>
-          Esqueci minha senha
-        </button>
+            <div className="relative">
+              <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type={mostrarSenha ? "text" : "password"} value={senha} onChange={(e) => setSenha(e.target.value)}
+                placeholder="Senha" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white", paddingRight: 40 }}
+              />
+              <button type="button" onClick={() => setMostrarSenha((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: COR.tintaSuave }}>
+                {mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
 
-        {erro && <p className="text-xs -mt-1" style={{ color: COR.vermelho }}>{erro}</p>}
-        {mensagem && <p className="text-xs -mt-1" style={{ color: COR.verde }}>{mensagem}</p>}
+            <button onClick={() => irPara("recuperar")} className="text-xs font-medium text-right -mt-2" style={{ color: COR.tintaSuave }}>
+              Esqueci minha senha
+            </button>
 
-        <button
-          onClick={entrar}
-          disabled={carregando}
-          className="w-full h-12 rounded-2xl font-bold text-sm text-white disabled:opacity-60"
-          style={{ background: COR.ouro }}
-        >
-          {carregando ? "Aguarde..." : "Entrar"}
-        </button>
+            {erro && <p className="text-xs -mt-1" style={{ color: COR.vermelho }}>{erro}</p>}
 
-        <div className="flex items-center gap-3 my-1">
-          <div className="flex-1 h-px" style={{ background: COR.linha }} />
-          <span className="text-xs" style={{ color: COR.tintaSuave }}>ou</span>
-          <div className="flex-1 h-px" style={{ background: COR.linha }} />
-        </div>
+            <button onClick={entrar} disabled={carregando} className="w-full h-12 rounded-2xl font-bold text-sm text-white disabled:opacity-60" style={{ background: COR.ouro }}>
+              {carregando ? "Aguarde..." : "Entrar"}
+            </button>
 
-        <button
-          onClick={entrarComGoogle}
-          disabled={carregando}
-          className="w-full h-12 flex items-center justify-center gap-3 rounded-2xl font-semibold text-sm disabled:opacity-60"
-          style={{ background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` }}
-        >
-          <svg width="18" height="18" viewBox="0 0 48 48">
-            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
-            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
-            <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z" />
-            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.5l6.3 5.3C41.6 35.4 44 30.2 44 24c0-1.3-.1-2.7-.4-3.5z" />
-          </svg>
-          Entrar com Google
-        </button>
+            <div className="flex items-center gap-3 my-1">
+              <div className="flex-1 h-px" style={{ background: COR.linha }} />
+              <span className="text-xs" style={{ color: COR.tintaSuave }}>ou</span>
+              <div className="flex-1 h-px" style={{ background: COR.linha }} />
+            </div>
 
-        <button
-          onClick={criarConta}
-          disabled={carregando}
-          className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl font-bold text-sm disabled:opacity-60"
-          style={{ background: "transparent", color: COR.ouro, border: `1.5px solid ${COR.ouro}` }}
-        >
-          <UserPlus size={16} /> Criar conta
-        </button>
+            <button onClick={entrarComGoogle} disabled={carregando} className="w-full h-12 flex items-center justify-center gap-3 rounded-2xl font-semibold text-sm disabled:opacity-60" style={{ background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` }}>
+              <svg width="18" height="18" viewBox="0 0 48 48">
+                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
+                <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+                <path fill="#4CAF50" d="M24 44c5.2 0 10.1-2 13.7-5.2l-6.3-5.3C29.3 35.4 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z" />
+                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.5l6.3 5.3C41.6 35.4 44 30.2 44 24c0-1.3-.1-2.7-.4-3.5z" />
+              </svg>
+              Entrar com Google
+            </button>
 
-        <div className="flex items-center justify-center gap-2 mt-2">
-          <ShieldCheck size={15} color={COR.tintaSuave} />
-          <p className="text-xs text-center" style={{ color: COR.tintaSuave }}>
-            Seus dados ficam protegidos com a segurança do Firebase
-          </p>
-        </div>
+            <button onClick={() => irPara("cadastro")} disabled={carregando} className="w-full h-12 flex items-center justify-center gap-2 rounded-2xl font-bold text-sm disabled:opacity-60" style={{ background: "transparent", color: COR.ouro, border: `1.5px solid ${COR.ouro}` }}>
+              <UserPlus size={16} /> Criar conta
+            </button>
+
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <ShieldCheck size={15} color={COR.tintaSuave} />
+              <p className="text-xs text-center" style={{ color: COR.tintaSuave }}>Seus dados ficam protegidos com a segurança do Firebase</p>
+            </div>
+          </>
+        )}
+
+        {tela === "cadastro" && (
+          <>
+            <div className="relative">
+              <User size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type="text" value={nomeCompleto} onChange={(e) => setNomeCompleto(e.target.value)}
+                placeholder="Nome completo" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white" }}
+              />
+            </div>
+
+            <div className="relative">
+              <Phone size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)}
+                placeholder="Telefone" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white" }}
+              />
+            </div>
+
+            <div className="relative">
+              <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="E-mail" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white" }}
+              />
+            </div>
+
+            <div className="relative">
+              <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type={mostrarSenha ? "text" : "password"} value={senha} onChange={(e) => setSenha(e.target.value)}
+                placeholder="Senha (mín. 6 caracteres)" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white", paddingRight: 40 }}
+              />
+              <button type="button" onClick={() => setMostrarSenha((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: COR.tintaSuave }}>
+                {mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type={mostrarConfirmarSenha ? "text" : "password"} value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)}
+                placeholder="Confirmar senha" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white", paddingRight: 40 }}
+              />
+              <button type="button" onClick={() => setMostrarConfirmarSenha((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: COR.tintaSuave }}>
+                {mostrarConfirmarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+
+            {erro && <p className="text-xs" style={{ color: COR.vermelho }}>{erro}</p>}
+
+            <button onClick={criarConta} disabled={carregando} className="w-full h-12 rounded-2xl font-bold text-sm text-white disabled:opacity-60" style={{ background: COR.ouro }}>
+              {carregando ? "Criando conta..." : "Criar conta"}
+            </button>
+          </>
+        )}
+
+        {tela === "recuperar" && (
+          <>
+            <div className="relative">
+              <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="E-mail" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white" }}
+              />
+            </div>
+
+            {erro && <p className="text-xs" style={{ color: COR.vermelho }}>{erro}</p>}
+            {mensagem && <p className="text-xs" style={{ color: COR.verde }}>{mensagem}</p>}
+
+            <button onClick={recuperarSenha} disabled={carregando} className="w-full h-12 rounded-2xl font-bold text-sm text-white disabled:opacity-60" style={{ background: COR.ouro }}>
+              {carregando ? "Enviando..." : "Enviar link de recuperação"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
