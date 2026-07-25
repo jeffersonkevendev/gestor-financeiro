@@ -6,8 +6,9 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  onAuthStateChanged, signInWithPopup, signOut,
+  onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile,
+  verifyPasswordResetCode, confirmPasswordReset,
 } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "./firebase";
@@ -277,10 +278,9 @@ function TelaLogin() {
     setErro(""); setMensagem("");
     setCarregando(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch {
       setErro("Não foi possível entrar. Tente novamente.");
-    } finally {
       setCarregando(false);
     }
   };
@@ -290,7 +290,10 @@ function TelaLogin() {
     if (!email.trim()) { setErro("Digite seu e-mail."); return; }
     setCarregando(true);
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      await sendPasswordResetEmail(auth, email.trim(), {
+        url: window.location.origin + window.location.pathname,
+        handleCodeInApp: true,
+      });
       setMensagem("Enviamos um link de recuperação para o seu e-mail. Abra-o pra redefinir sua senha.");
     } catch (e) {
       setErro(mensagemErroAuth(e.code));
@@ -489,6 +492,126 @@ function TelaLogin() {
   );
 }
 
+// -------- tela de redefinir senha (aberta a partir do link do e-mail) --------
+function TelaRedefinirSenha({ oobCode }) {
+  const [emailConta, setEmailConta] = useState(null); // null = verificando, false = link inválido, string = e-mail
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [concluido, setConcluido] = useState(false);
+
+  useEffect(() => {
+    verifyPasswordResetCode(auth, oobCode)
+      .then((email) => setEmailConta(email))
+      .catch(() => setEmailConta(false));
+  }, [oobCode]);
+
+  const redefinir = async () => {
+    setErro("");
+    if (!novaSenha || !confirmarNovaSenha) { setErro("Preencha os dois campos."); return; }
+    if (novaSenha.length < 6) { setErro("A senha precisa ter pelo menos 6 caracteres."); return; }
+    if (novaSenha !== confirmarNovaSenha) { setErro("As senhas não coincidem."); return; }
+    setCarregando(true);
+    try {
+      await confirmPasswordReset(auth, oobCode, novaSenha);
+      window.history.replaceState({}, "", window.location.pathname);
+      setConcluido(true);
+    } catch (e) {
+      setErro(mensagemErroAuth(e.code));
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const irParaOApp = () => { window.location.href = window.location.pathname; };
+
+  const campoBase = "w-full h-12 pl-11 pr-4 rounded-2xl border text-sm outline-none box-border";
+
+  return (
+    <div className="min-h-screen w-full" style={{ background: COR.papel }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+        .fonte-display { font-family: 'Fraunces', serif; }
+        .campo-login:focus { border-color: ${COR.ouro} !important; box-shadow: 0 0 0 2px ${COR.ouroClaro}; }
+      `}</style>
+
+      <div className="relative pt-14 pb-20 px-6 text-center" style={{ background: COR.tinta }}>
+        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 mx-auto" style={{ border: `2px solid ${COR.ouro}` }}>
+          <Wallet size={32} color={COR.ouro} strokeWidth={2} />
+        </div>
+        <h1 className="fonte-display text-3xl font-bold mb-3" style={{ color: "white" }}>Redefinir senha</h1>
+        <p className="text-sm mx-auto" style={{ color: "rgba(255,255,255,0.7)", maxWidth: 300 }}>
+          {emailConta ? `Crie uma nova senha para ${emailConta}` : "Escolha uma nova senha pra sua conta."}
+        </p>
+        <svg className="absolute left-0 bottom-0 w-full" style={{ height: 36 }} viewBox="0 0 500 60" preserveAspectRatio="none">
+          <path d="M0,30 C150,70 350,-10 500,30 L500,60 L0,60 Z" fill={COR.papel} />
+        </svg>
+      </div>
+
+      <div className="px-6 pb-10 pt-2 flex flex-col gap-4 max-w-sm mx-auto">
+        {emailConta === null && (
+          <p className="text-sm text-center" style={{ color: COR.tintaSuave }}>Verificando link...</p>
+        )}
+
+        {emailConta === false && (
+          <>
+            <p className="text-sm text-center" style={{ color: COR.vermelho }}>
+              Esse link é inválido ou já expirou. Peça um novo link de recuperação na tela de login.
+            </p>
+            <button onClick={irParaOApp} className="w-full h-12 rounded-2xl font-bold text-sm text-white" style={{ background: COR.ouro }}>
+              Ir para o login
+            </button>
+          </>
+        )}
+
+        {emailConta && !concluido && (
+          <>
+            <div className="relative">
+              <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type={mostrarSenha ? "text" : "password"} value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)}
+                placeholder="Nova senha (mín. 6 caracteres)" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white", paddingRight: 40 }}
+              />
+              <button type="button" onClick={() => setMostrarSenha((v) => !v)} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: COR.tintaSuave }}>
+                {mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" color={COR.tintaSuave} />
+              <input
+                type={mostrarSenha ? "text" : "password"} value={confirmarNovaSenha} onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+                placeholder="Confirmar nova senha" className={campoBase + " campo-login"}
+                style={{ borderColor: COR.linha, background: "white" }}
+              />
+            </div>
+
+            {erro && <p className="text-xs" style={{ color: COR.vermelho }}>{erro}</p>}
+
+            <button onClick={redefinir} disabled={carregando} className="w-full h-12 rounded-2xl font-bold text-sm text-white disabled:opacity-60" style={{ background: COR.ouro }}>
+              {carregando ? "Salvando..." : "Redefinir senha"}
+            </button>
+          </>
+        )}
+
+        {concluido && (
+          <>
+            <p className="text-sm text-center" style={{ color: COR.verde }}>
+              Senha redefinida com sucesso! Já pode entrar com a nova senha.
+            </p>
+            <button onClick={irParaOApp} className="w-full h-12 rounded-2xl font-bold text-sm text-white" style={{ background: COR.ouro }}>
+              Ir para o login
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Carrossel horizontal de meses, no estilo fatura (rolagem lateral, mês ativo em destaque)
 function CarrosselMeses({ meses, mesSelecionado, onSelecionar, corAtiva }) {
   return (
@@ -555,8 +678,15 @@ export default function App() {
 
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => setUsuario(u));
+    getRedirectResult(auth).catch(() => {});
     return cancelar;
   }, []);
+
+  const parametrosUrl = new URLSearchParams(window.location.search);
+  const oobCode = parametrosUrl.get("oobCode");
+  if (parametrosUrl.get("mode") === "resetPassword" && oobCode) {
+    return <TelaRedefinirSenha oobCode={oobCode} />;
+  }
 
   if (usuario === undefined) return <TelaCarregando />;
   if (usuario === null) return <TelaLogin />;
