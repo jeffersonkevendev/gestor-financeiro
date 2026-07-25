@@ -1010,7 +1010,6 @@ function MeuCaixaApp({ usuario }) {
               <tr style={{ textAlign: "left", color: "#555" }}>
                 {relatorio.pessoaFiltro === "todos" && <th style={{ padding: "3px 0" }}>Pessoa</th>}
                 <th style={{ padding: "3px 0" }}>Compra</th>
-                <th style={{ padding: "3px 0" }}>Data</th>
                 <th style={{ padding: "3px 0", textAlign: "right" }}>Valor</th>
               </tr>
             </thead>
@@ -1019,7 +1018,6 @@ function MeuCaixaApp({ usuario }) {
                 <tr key={c.id} style={{ borderTop: "1px solid #eee" }}>
                   {relatorio.pessoaFiltro === "todos" && <td style={{ padding: "3px 0" }}>{c.nome}</td>}
                   <td style={{ padding: "3px 0" }}>{c.compra}</td>
-                  <td style={{ padding: "3px 0" }}>{new Date(c.data + "T00:00:00").toLocaleDateString("pt-BR")}</td>
                   <td style={{ padding: "3px 0", textAlign: "right" }} className="fonte-mono">{fmt(c.valor)}</td>
                 </tr>
               ))}
@@ -1383,8 +1381,8 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
 
   const adicionar = () => {
     const valor = parseFloat(nova.valor);
-    if (!nova.nome.trim() || !nova.compra.trim() || !nova.data || !(valor > 0)) return;
-    const novaCompra = { id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: nova.data };
+    if (!nova.nome.trim() || !nova.compra.trim() || !(valor > 0)) return;
+    const novaCompra = { id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: hojeISO() };
     onAtualizarCompras([...compras, novaCompra]);
     setNova({ nome: "", compra: "", valor: "", data: "" });
     setMostrarForm(false);
@@ -1395,10 +1393,10 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
 
   const salvarEdicao = () => {
     const valor = parseFloat(rascunho.valor);
-    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !rascunho.data || !(valor > 0)) return;
+    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(valor > 0)) return;
     onAtualizarCompras(compras.map((c) =>
       c.id === editandoId
-        ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor, data: rascunho.data }
+        ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor }
         : c
     ));
     setEditandoId(null);
@@ -1470,14 +1468,6 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
               onChange={(e) => setNova({ ...nova, nome: e.target.value })}
             />
           </Campo>
-          <Campo label="Data da compra">
-            <input
-              className={inputBase} style={{ borderColor: COR.linha }}
-              type="date"
-              value={nova.data}
-              onChange={(e) => setNova({ ...nova, data: e.target.value })}
-            />
-          </Campo>
           <Campo label="Compra">
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
@@ -1524,12 +1514,6 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
                   />
                   <input
                     className={inputBase} style={{ borderColor: COR.linha }}
-                    type="date"
-                    value={rascunho.data}
-                    onChange={(e) => setRascunho({ ...rascunho, data: e.target.value })}
-                  />
-                  <input
-                    className={inputBase} style={{ borderColor: COR.linha }}
                     value={rascunho.compra}
                     onChange={(e) => setRascunho({ ...rascunho, compra: e.target.value })}
                   />
@@ -1558,9 +1542,6 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{c.compra}</p>
-                      <p className="text-xs" style={{ color: COR.tintaSuave }}>
-                        {new Date(c.data + "T00:00:00").toLocaleDateString("pt-BR")}
-                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
