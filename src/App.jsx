@@ -1353,6 +1353,9 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
+  const [parcelada, setParcelada] = useState(false);
+  const [parcelaAtual, setParcelaAtual] = useState("1");
+  const [totalParcelas, setTotalParcelas] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
 
@@ -1382,11 +1385,37 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
   const adicionar = () => {
     const valor = parseFloat(nova.valor);
     if (!nova.nome.trim() || !nova.compra.trim() || !(valor > 0)) return;
-    const novaCompra = { id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: hojeISO() };
-    onAtualizarCompras([...compras, novaCompra]);
+
+    let novosRegistros;
+    if (parcelada) {
+      const inicio = parseInt(parcelaAtual, 10);
+      const total = parseInt(totalParcelas, 10);
+      if (!(inicio >= 1) || !(total >= inicio)) return;
+      const totalLimitado = Math.min(total, 120);
+      const hoje = new Date();
+      novosRegistros = [];
+      for (let numero = inicio; numero <= totalLimitado; numero++) {
+        const dataParcela = new Date(hoje.getFullYear(), hoje.getMonth() + (numero - inicio), hoje.getDate());
+        const dataStr = `${dataParcela.getFullYear()}-${String(dataParcela.getMonth() + 1).padStart(2, "0")}-${String(dataParcela.getDate()).padStart(2, "0")}`;
+        novosRegistros.push({
+          id: uid(),
+          nome: nova.nome.trim(),
+          compra: `${nova.compra.trim()} (parcela ${numero}/${totalLimitado})`,
+          valor,
+          data: dataStr,
+        });
+      }
+    } else {
+      novosRegistros = [{ id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: hojeISO() }];
+    }
+
+    onAtualizarCompras([...compras, ...novosRegistros]);
     setNova({ nome: "", compra: "", valor: "", data: "" });
+    setParcelada(false);
+    setParcelaAtual("1");
+    setTotalParcelas("");
     setMostrarForm(false);
-    setMesSelecionado(chaveDoMes(novaCompra.data));
+    setMesSelecionado(chaveDoMes(novosRegistros[0].data));
   };
 
   const iniciarEdicao = (c) => { setEditandoId(c.id); setRascunho({ ...c, valor: String(c.valor) }); };
@@ -1476,7 +1505,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
               onChange={(e) => setNova({ ...nova, compra: e.target.value })}
             />
           </Campo>
-          <Campo label="Valor (R$)">
+          <Campo label={parcelada ? "Valor da parcela (R$)" : "Valor (R$)"}>
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
               type="number" step="0.01" min="0" placeholder="0,00"
@@ -1484,6 +1513,42 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
               onChange={(e) => setNova({ ...nova, valor: e.target.value })}
             />
           </Campo>
+
+          <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
+            <input
+              type="checkbox"
+              checked={parcelada}
+              onChange={(e) => setParcelada(e.target.checked)}
+              className="w-4 h-4"
+              style={{ accentColor: corPrincipal }}
+            />
+            Compra parcelada
+          </label>
+
+          {parcelada && (
+            <>
+              <Campo label="Em qual parcela ela está agora">
+                <input
+                  className={inputBase} style={{ borderColor: COR.linha }}
+                  type="number" min="1" placeholder="Ex: 7"
+                  value={parcelaAtual}
+                  onChange={(e) => setParcelaAtual(e.target.value)}
+                />
+              </Campo>
+              <Campo label="Total de parcelas">
+                <input
+                  className={inputBase} style={{ borderColor: COR.linha }}
+                  type="number" min="1" placeholder="Ex: 12"
+                  value={totalParcelas}
+                  onChange={(e) => setTotalParcelas(e.target.value)}
+                />
+              </Campo>
+              <p className="text-xs -mt-1" style={{ color: COR.tintaSuave }}>
+                Vamos lançar essa compra a partir deste mês até a parcela {totalParcelas || "final"}, uma por mês, automaticamente.
+              </p>
+            </>
+          )}
+
           <div className="flex gap-2 justify-end mt-1">
             <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
               Cancelar
