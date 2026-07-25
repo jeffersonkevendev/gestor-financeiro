@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  onAuthStateChanged, signInWithPopup, signOut,
+  onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile,
   verifyPasswordResetCode, confirmPasswordReset,
 } from "firebase/auth";
@@ -98,6 +98,12 @@ const totalAutomaticoEmMes = (comprasPorMesObj, chave, pessoas) =>
   (comprasPorMesObj[chave] || []).filter((c) => ehPessoaAutomatica(c.nome, pessoas)).reduce((s, c) => s + c.valor, 0);
 
 const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+// Detecta se o app está rodando "instalado" (tela cheia, sem barra do navegador) — nesse modo,
+// o popup de login não funciona, então usamos redirecionamento em vez de popup.
+const emModoInstalado = () =>
+  typeof window !== "undefined" &&
+  (window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator?.standalone === true);
 
 const mesAtualChave = () => {
   const d = new Date();
@@ -278,7 +284,11 @@ function TelaLogin() {
     setErro(""); setMensagem("");
     setCarregando(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      if (emModoInstalado()) {
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
     } catch (e) {
       if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
         setErro(mensagemErroAuth(e.code));
@@ -681,6 +691,7 @@ export default function App() {
 
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => setUsuario(u));
+    getRedirectResult(auth).catch(() => {});
     return cancelar;
   }, []);
 
