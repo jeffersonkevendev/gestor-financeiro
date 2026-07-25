@@ -1353,6 +1353,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
+  const [mesCompra, setMesCompra] = useState(mesAtualChave());
   const [parcelada, setParcelada] = useState(false);
   const [parcelaAtual, setParcelaAtual] = useState("1");
   const [totalParcelas, setTotalParcelas] = useState("");
@@ -1384,7 +1385,9 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
 
   const adicionar = () => {
     const valor = parseFloat(nova.valor);
-    if (!nova.nome.trim() || !nova.compra.trim() || !(valor > 0)) return;
+    if (!nova.nome.trim() || !nova.compra.trim() || !(valor > 0) || !mesCompra) return;
+
+    const [anoBase, mesBase] = mesCompra.split("-").map(Number);
 
     let novosRegistros;
     if (parcelada) {
@@ -1392,11 +1395,10 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
       const total = parseInt(totalParcelas, 10);
       if (!(inicio >= 1) || !(total >= inicio)) return;
       const totalLimitado = Math.min(total, 120);
-      const hoje = new Date();
       novosRegistros = [];
       for (let numero = inicio; numero <= totalLimitado; numero++) {
-        const dataParcela = new Date(hoje.getFullYear(), hoje.getMonth() + (numero - inicio), hoje.getDate());
-        const dataStr = `${dataParcela.getFullYear()}-${String(dataParcela.getMonth() + 1).padStart(2, "0")}-${String(dataParcela.getDate()).padStart(2, "0")}`;
+        const dataParcela = new Date(anoBase, mesBase - 1 + (numero - inicio), 1);
+        const dataStr = `${dataParcela.getFullYear()}-${String(dataParcela.getMonth() + 1).padStart(2, "0")}-01`;
         novosRegistros.push({
           id: uid(),
           nome: nova.nome.trim(),
@@ -1406,7 +1408,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
         });
       }
     } else {
-      novosRegistros = [{ id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: hojeISO() }];
+      novosRegistros = [{ id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: `${mesCompra}-01` }];
     }
 
     onAtualizarCompras([...compras, ...novosRegistros]);
@@ -1503,6 +1505,14 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
               placeholder="Ex: Supermercado, farmácia..."
               value={nova.compra}
               onChange={(e) => setNova({ ...nova, compra: e.target.value })}
+            />
+          </Campo>
+          <Campo label={parcelada ? "Mês da 1ª parcela lançada" : "Mês da compra"}>
+            <input
+              className={inputBase} style={{ borderColor: COR.linha }}
+              type="month"
+              value={mesCompra}
+              onChange={(e) => setMesCompra(e.target.value)}
             />
           </Campo>
           <Campo label={parcelada ? "Valor da parcela (R$)" : "Valor (R$)"}>
