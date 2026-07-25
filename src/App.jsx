@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
-  onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut,
+  onAuthStateChanged, signInWithPopup, signOut,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, updateProfile,
   verifyPasswordResetCode, confirmPasswordReset,
 } from "firebase/auth";
@@ -278,9 +278,12 @@ function TelaLogin() {
     setErro(""); setMensagem("");
     setCarregando(true);
     try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch {
-      setErro("Não foi possível entrar. Tente novamente.");
+      await signInWithPopup(auth, googleProvider);
+    } catch (e) {
+      if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
+        setErro(mensagemErroAuth(e.code));
+      }
+    } finally {
       setCarregando(false);
     }
   };
@@ -678,7 +681,6 @@ export default function App() {
 
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => setUsuario(u));
-    getRedirectResult(auth).catch(() => {});
     return cancelar;
   }, []);
 
