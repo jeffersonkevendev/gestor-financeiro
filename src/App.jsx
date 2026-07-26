@@ -11,6 +11,7 @@ import {
   verifyPasswordResetCode, confirmPasswordReset,
 } from "firebase/auth";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import html2canvas from "html2canvas";
 import { auth, googleProvider, db } from "./firebase";
 
 const mensagemErroAuth = (codigo) => {
@@ -797,18 +798,30 @@ function MeuCaixaApp({ usuario }) {
     URL.revokeObjectURL(url);
   };
 
-  // ---------- relatório em PDF (compartilhado entre os cartões, para não duplicar na impressão) ----------
+  // ---------- relatório em imagem (compartilhado entre os cartões, para não duplicar) ----------
   const [relatorio, setRelatorio] = useState(null);
+  const [gerandoImagem, setGerandoImagem] = useState(false);
 
   const gerarRelatorio = (dados) => {
     setRelatorio(dados);
-    setTimeout(() => {
-      const tituloAnterior = document.title;
-      const slug = dados.nomeCartao.replace(/\s+/g, "-");
-      document.title = `Relatorio-${slug}-${dados.pessoaFiltro === "todos" ? "todos" : dados.pessoaFiltro}-${dados.mesSelecionado}`;
-      window.print();
-      setTimeout(() => { document.title = tituloAnterior; }, 500);
-    }, 50);
+    setGerandoImagem(true);
+    setTimeout(async () => {
+      const elemento = document.getElementById("relatorio-para-captura");
+      if (!elemento) { setGerandoImagem(false); return; }
+      try {
+        const canvas = await html2canvas(elemento, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+        const url = canvas.toDataURL("image/jpeg", 0.92);
+        const slug = dados.nomeCartao.replace(/\s+/g, "-");
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Relatorio-${slug}-${dados.pessoaFiltro === "todos" ? "todos" : dados.pessoaFiltro}-${dados.mesSelecionado}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        setGerandoImagem(false);
+      }
+    }, 80);
   };
 
   const cartaoAtivo = cartoes.find((c) => `cartao-${c.id}` === aba);
@@ -827,11 +840,7 @@ function MeuCaixaApp({ usuario }) {
         .fonte-display { font-family: 'Fraunces', serif; }
         .fonte-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
         input:focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
-        .relatorio-impressao { display: none; }
-        @media print {
-          .oculta-impressao { display: none !important; }
-          .relatorio-impressao { display: block !important; }
-        }
+        .relatorio-impressao { position: fixed; top: 0; left: -10000px; width: 420px; background: white; }
       `}</style>
 
       {/* cabeçalho */}
@@ -969,6 +978,7 @@ function MeuCaixaApp({ usuario }) {
                   setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
                 }
                 onGerarPdf={gerarRelatorio}
+                gerandoImagem={gerandoImagem}
                 onPedirExclusao={() => setCartaoParaExcluir(cartao)}
                 pessoasAutomaticas={pessoasAutomaticas}
               />
@@ -1005,7 +1015,7 @@ function MeuCaixaApp({ usuario }) {
 
       {/* área exclusiva de impressão / PDF — única para qualquer cartão, evita duplicar relatórios */}
       {relatorio && (
-        <div className="relatorio-impressao" style={{ color: "#111", fontFamily: "'Inter', ui-sans-serif" }}>
+        <div id="relatorio-para-captura" className="relatorio-impressao" style={{ color: "#111", fontFamily: "'Inter', ui-sans-serif", padding: 24 }}>
           <h1 className="fonte-display" style={{ fontSize: "22px", marginBottom: 2 }}>
             Relatório de compras — {relatorio.nomeCartao}
           </h1>
@@ -1357,7 +1367,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
 }
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
-function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pessoasAutomaticas }) {
+function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas }) {
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
 
   const [pessoaFiltro, setPessoaFiltro] = useState("todos");
@@ -1473,12 +1483,12 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, onPedirExclusao, pe
         <div className="flex items-end">
           <button
             onClick={gerarRelatorioPdf}
-            disabled={linhasMes.length === 0}
+            disabled={linhasMes.length === 0 || gerandoImagem}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold text-white disabled:opacity-40"
             style={{ background: COR.tinta }}
-            title={pessoaFiltro === "todos" ? "Gera o relatório do mês selecionado" : `Gera o relatório de ${pessoaFiltro} no mês selecionado`}
+            title={pessoaFiltro === "todos" ? "Gera uma imagem do relatório do mês selecionado" : `Gera uma imagem do relatório de ${pessoaFiltro} no mês selecionado`}
           >
-            <FileDown size={15} /> Gerar PDF
+            <FileDown size={15} /> {gerandoImagem ? "Gerando..." : "Gerar imagem"}
           </button>
         </div>
       </div>
