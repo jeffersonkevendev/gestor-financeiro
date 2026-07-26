@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
-  ArrowLeft, User, Phone,
+  ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
@@ -711,6 +711,7 @@ function MeuCaixaApp({ usuario }) {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
   const { despesas, setDespesas, cartoes, setCartoes, pessoasAutomaticas, setPessoasAutomaticas, carregando } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
+  const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
 
   const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
@@ -987,6 +988,17 @@ function MeuCaixaApp({ usuario }) {
         </div>
       </main>
 
+      {/* botão flutuante da calculadora */}
+      <button
+        onClick={() => setMostrarCalculadora(true)}
+        className="fixed z-40 w-14 h-14 rounded-full flex items-center justify-center oculta-impressao"
+        style={{ background: COR.ouro, right: 18, bottom: 22, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" }}
+        title="Calculadora"
+      >
+        <IconeCalculadora size={22} color="white" />
+      </button>
+      <Calculadora aberta={mostrarCalculadora} aoFechar={() => setMostrarCalculadora(false)} />
+
       {/* modal de confirmação — excluir cartão */}
       {cartaoParaExcluir && (
         <div
@@ -1051,6 +1063,136 @@ function MeuCaixaApp({ usuario }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ===================== CALCULADORA =====================
+function Calculadora({ aberta, aoFechar }) {
+  const [visor, setVisor] = useState("0");
+  const [valorAnterior, setValorAnterior] = useState(null);
+  const [operador, setOperador] = useState(null);
+  const [aguardandoNovoValor, setAguardandoNovoValor] = useState(false);
+
+  if (!aberta) return null;
+
+  const formatarResultado = (n) => {
+    if (!isFinite(n)) return "Erro";
+    const arredondado = Math.round(n * 1e8) / 1e8;
+    return String(arredondado);
+  };
+
+  const inserirNumero = (digito) => {
+    setVisor((v) => {
+      if (aguardandoNovoValor) { setAguardandoNovoValor(false); return digito; }
+      if (v === "0") return digito;
+      if (v.replace("-", "").length >= 14) return v;
+      return v + digito;
+    });
+  };
+
+  const inserirPonto = () => {
+    setVisor((v) => {
+      if (aguardandoNovoValor) { setAguardandoNovoValor(false); return "0."; }
+      return v.includes(".") ? v : v + ".";
+    });
+  };
+
+  const calcular = (proximoOperador = null) => {
+    if (operador === null || valorAnterior === null) {
+      if (proximoOperador) { setOperador(proximoOperador); setAguardandoNovoValor(true); }
+      return;
+    }
+    const atual = parseFloat(visor);
+    let resultado = atual;
+    if (operador === "+") resultado = valorAnterior + atual;
+    else if (operador === "-") resultado = valorAnterior - atual;
+    else if (operador === "×") resultado = valorAnterior * atual;
+    else if (operador === "÷") resultado = atual === 0 ? Infinity : valorAnterior / atual;
+
+    const texto = formatarResultado(resultado);
+    setVisor(texto);
+    setValorAnterior(proximoOperador ? parseFloat(texto) : null);
+    setOperador(proximoOperador);
+    setAguardandoNovoValor(true);
+  };
+
+  const escolherOperador = (op) => {
+    if (operador && !aguardandoNovoValor) { calcular(op); return; }
+    setValorAnterior(parseFloat(visor));
+    setOperador(op);
+    setAguardandoNovoValor(true);
+  };
+
+  const limpar = () => { setVisor("0"); setValorAnterior(null); setOperador(null); setAguardandoNovoValor(false); };
+  const apagar = () => setVisor((v) => (v.length > 1 ? v.slice(0, -1) : "0"));
+  const alternarSinal = () => setVisor((v) => (v === "0" ? v : v.startsWith("-") ? v.slice(1) : `-${v}`));
+  const porcentagem = () => setVisor((v) => formatarResultado(parseFloat(v) / 100));
+
+  const BotaoCalc = ({ children, onClick, cor = "numero", className = "" }) => {
+    const estilos = {
+      numero: { background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` },
+      funcao: { background: COR.papelEscuro, color: COR.tinta },
+      operador: { background: COR.ouro, color: "white" },
+      igual: { background: COR.tinta, color: COR.ouroClaro },
+    };
+    return (
+      <button
+        onClick={onClick}
+        className={`h-14 rounded-xl text-lg font-semibold flex items-center justify-center active:opacity-70 ${className}`}
+        style={estilos[cor]}
+      >
+        {children}
+      </button>
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center oculta-impressao"
+      style={{ background: "rgba(28,35,51,0.6)" }}
+      onClick={aoFechar}
+    >
+      <div
+        className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{ background: COR.papel }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-6" style={{ background: COR.tinta }}>
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.7)" }}>Calculadora</p>
+            <button onClick={aoFechar} style={{ color: "rgba(255,255,255,0.7)" }}><X size={18} /></button>
+          </div>
+          <p className="fonte-mono text-right text-4xl font-bold truncate" style={{ color: "white" }}>{visor}</p>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2.5 p-4">
+          <BotaoCalc onClick={limpar} cor="funcao">C</BotaoCalc>
+          <BotaoCalc onClick={apagar} cor="funcao"><Delete size={18} /></BotaoCalc>
+          <BotaoCalc onClick={porcentagem} cor="funcao">%</BotaoCalc>
+          <BotaoCalc onClick={() => escolherOperador("÷")} cor="operador">÷</BotaoCalc>
+
+          <BotaoCalc onClick={() => inserirNumero("7")}>7</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("8")}>8</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("9")}>9</BotaoCalc>
+          <BotaoCalc onClick={() => escolherOperador("×")} cor="operador">×</BotaoCalc>
+
+          <BotaoCalc onClick={() => inserirNumero("4")}>4</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("5")}>5</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("6")}>6</BotaoCalc>
+          <BotaoCalc onClick={() => escolherOperador("-")} cor="operador">−</BotaoCalc>
+
+          <BotaoCalc onClick={() => inserirNumero("1")}>1</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("2")}>2</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("3")}>3</BotaoCalc>
+          <BotaoCalc onClick={() => escolherOperador("+")} cor="operador">+</BotaoCalc>
+
+          <BotaoCalc onClick={alternarSinal} cor="funcao">+/-</BotaoCalc>
+          <BotaoCalc onClick={() => inserirNumero("0")}>0</BotaoCalc>
+          <BotaoCalc onClick={inserirPonto}>,</BotaoCalc>
+          <BotaoCalc onClick={() => calcular()} cor="igual">=</BotaoCalc>
+        </div>
+      </div>
     </div>
   );
 }
