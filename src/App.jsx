@@ -100,6 +100,20 @@ const totalAutomaticoEmMes = (comprasPorMesObj, chave, pessoas) =>
 
 const hojeISO = () => new Date().toISOString().slice(0, 10);
 
+// Máscara de valor monetário: digita só números, a vírgula e os centavos vão se ajustando sozinhos.
+const formatarValorDigitado = (textoDigitado) => {
+  const digitos = textoDigitado.replace(/\D/g, "");
+  if (!digitos) return "";
+  const centavos = parseInt(digitos, 10);
+  return (centavos / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const valorMascaradoParaNumero = (mascarado) => {
+  if (!mascarado) return NaN;
+  const limpo = mascarado.replace(/\./g, "").replace(",", ".");
+  return parseFloat(limpo);
+};
+
 // Detecta se o app está rodando "instalado" (tela cheia, sem barra do navegador) — nesse modo,
 // o popup de login não funciona, então usamos redirecionamento em vez de popup.
 const emModoInstalado = () =>
@@ -1259,7 +1273,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
   }), [chaves, despesasPorMes, fontesCartao]);
 
   const adicionar = () => {
-    const valor = parseFloat(nova.valor);
+    const valor = valorMascaradoParaNumero(nova.valor);
     if (!nova.descricao.trim() || !nova.vencimento || !(valor > 0)) return;
     const novaDespesa = { id: uid(), descricao: nova.descricao.trim(), valor, vencimento: nova.vencimento, categoria: nova.categoria || "Outros", paga: false };
     onAtualizarDespesas([...despesas, novaDespesa]);
@@ -1268,10 +1282,10 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
     setMesSelecionado(chaveDoMes(novaDespesa.vencimento));
   };
 
-  const iniciarEdicao = (d) => { setEditandoId(d.id); setRascunho({ ...d, valor: String(d.valor) }); };
+  const iniciarEdicao = (d) => { setEditandoId(d.id); setRascunho({ ...d, valor: formatarValorDigitado(String(Math.round(d.valor * 100))) }); };
 
   const salvarEdicao = () => {
-    const valor = parseFloat(rascunho.valor);
+    const valor = valorMascaradoParaNumero(rascunho.valor);
     if (!rascunho.descricao.trim() || !rascunho.vencimento || !(valor > 0)) return;
     onAtualizarDespesas(despesas.map((d) =>
       d.id === editandoId
@@ -1368,9 +1382,9 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
             <input
               className={inputBase}
               style={{ borderColor: COR.linha }}
-              type="number" step="0.01" min="0" placeholder="0,00"
+              type="text" inputMode="numeric" placeholder="0,00"
               value={nova.valor}
-              onChange={(e) => setNova({ ...nova, valor: e.target.value })}
+              onChange={(e) => setNova({ ...nova, valor: formatarValorDigitado(e.target.value) })}
             />
           </Campo>
           <Campo label="Vencimento">
@@ -1419,9 +1433,9 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                   </select>
                   <input
                     className={inputBase} style={{ borderColor: COR.linha }}
-                    type="number" step="0.01" min="0"
+                    type="text" inputMode="numeric"
                     value={rascunho.valor}
-                    onChange={(e) => setRascunho({ ...rascunho, valor: e.target.value })}
+                    onChange={(e) => setRascunho({ ...rascunho, valor: formatarValorDigitado(e.target.value) })}
                   />
                   <input
                     className={inputBase} style={{ borderColor: COR.linha }}
@@ -1516,6 +1530,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
+  const [valorNegativo, setValorNegativo] = useState(false);
   const [mesCompra, setMesCompra] = useState(mesAtualChave());
   const [parcelada, setParcelada] = useState(false);
   const [parcelaAtual, setParcelaAtual] = useState("1");
@@ -1547,8 +1562,9 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const totalMes = linhasMes.reduce((s, c) => s + c.valor, 0);
 
   const adicionar = () => {
-    const valor = parseFloat(nova.valor);
-    if (!nova.nome.trim() || !nova.compra.trim() || !(valor > 0) || !mesCompra) return;
+    const magnitude = valorMascaradoParaNumero(nova.valor);
+    if (!nova.nome.trim() || !nova.compra.trim() || !(magnitude > 0) || !mesCompra) return;
+    const valor = valorNegativo ? -magnitude : magnitude;
 
     const [anoBase, mesBase] = mesCompra.split("-").map(Number);
 
@@ -1576,6 +1592,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
     onAtualizarCompras([...compras, ...novosRegistros]);
     setNova({ nome: "", compra: "", valor: "", data: "" });
+    setValorNegativo(false);
     setParcelada(false);
     setParcelaAtual("1");
     setTotalParcelas("");
@@ -1583,11 +1600,15 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
     setMesSelecionado(chaveDoMes(novosRegistros[0].data));
   };
 
-  const iniciarEdicao = (c) => { setEditandoId(c.id); setRascunho({ ...c, valor: String(c.valor) }); };
+  const iniciarEdicao = (c) => {
+    setEditandoId(c.id);
+    setRascunho({ ...c, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valor) * 100))), negativo: c.valor < 0 });
+  };
 
   const salvarEdicao = () => {
-    const valor = parseFloat(rascunho.valor);
-    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(valor > 0)) return;
+    const magnitude = valorMascaradoParaNumero(rascunho.valor);
+    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(magnitude > 0)) return;
+    const valor = rascunho.negativo ? -magnitude : magnitude;
     onAtualizarCompras(compras.map((c) =>
       c.id === editandoId
         ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor }
@@ -1681,11 +1702,22 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
           <Campo label={parcelada ? "Valor da parcela (R$)" : "Valor (R$)"}>
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
-              type="number" step="0.01" min="0" placeholder="0,00"
+              type="text" inputMode="numeric" placeholder="0,00"
               value={nova.valor}
-              onChange={(e) => setNova({ ...nova, valor: e.target.value })}
+              onChange={(e) => setNova({ ...nova, valor: formatarValorDigitado(e.target.value) })}
             />
           </Campo>
+
+          <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
+            <input
+              type="checkbox"
+              checked={valorNegativo}
+              onChange={(e) => setValorNegativo(e.target.checked)}
+              className="w-4 h-4"
+              style={{ accentColor: corPrincipal }}
+            />
+            Valor negativo (pagamento antecipado / estorno)
+          </label>
 
           <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
             <input
@@ -1757,10 +1789,20 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                   />
                   <input
                     className={inputBase} style={{ borderColor: COR.linha }}
-                    type="number" step="0.01" min="0"
+                    type="text" inputMode="numeric"
                     value={rascunho.valor}
-                    onChange={(e) => setRascunho({ ...rascunho, valor: e.target.value })}
+                    onChange={(e) => setRascunho({ ...rascunho, valor: formatarValorDigitado(e.target.value) })}
                   />
+                  <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
+                    <input
+                      type="checkbox"
+                      checked={!!rascunho.negativo}
+                      onChange={(e) => setRascunho({ ...rascunho, negativo: e.target.checked })}
+                      className="w-4 h-4"
+                      style={{ accentColor: corPrincipal }}
+                    />
+                    Valor negativo (pagamento antecipado / estorno)
+                  </label>
                   <div className="flex gap-2 justify-end">
                     <button onClick={cancelarEdicao} className="p-1.5 rounded-md" style={{ color: COR.tintaSuave }}><X size={16} /></button>
                     <button onClick={salvarEdicao} className="p-1.5 rounded-md text-white" style={{ background: corPrincipal }}><Check size={16} /></button>
