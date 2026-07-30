@@ -975,7 +975,7 @@ function MeuCaixaApp({ usuario }) {
             transition: arrastandoRef.current ? "none" : "transform 0.25s ease",
           }}
         >
-          <div className="max-w-2xl mx-auto px-5 py-6 w-full shrink-0 oculta-impressao">
+          <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
             <DespesasTab
               despesas={despesas}
               onAtualizarDespesas={setDespesas}
@@ -986,7 +986,7 @@ function MeuCaixaApp({ usuario }) {
             />
           </div>
           {cartoes.map((cartao) => (
-            <div key={cartao.id} className="max-w-2xl mx-auto px-5 py-6 w-full shrink-0">
+            <div key={cartao.id} className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0">
               <CartaoTab
                 cartao={cartao}
                 onAtualizarCompras={(novasCompras) =>
@@ -1449,35 +1449,39 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-3 px-3 py-2.5">
-                  <button onClick={() => togglePaga(d.id)} className="mt-0.5 shrink-0" title={d.paga ? "Marcar como pendente" : "Marcar como paga"}>
-                    {d.paga ? <CheckCircle2 size={18} color={COR.verde} /> : <Circle size={18} color={COR.tintaSuave} />}
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="text-sm font-medium truncate"
-                      style={{ textDecoration: d.paga ? "line-through" : "none", color: d.paga ? COR.tintaSuave : COR.tinta }}
-                    >
-                      {d.descricao}
-                    </p>
-                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: corCategoria(d.categoria) + "22", color: corCategoria(d.categoria) }}>
-                        {d.categoria}
-                      </span>
-                      <span className="text-xs" style={{ color: COR.tintaSuave }}>
-                        Vence em {new Date(d.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
-                      </span>
-                      {!d.paga && d.vencimento < hojeISO() && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#F8D9DF", color: COR.vermelho }}>
-                          Atrasada
+                <div className="px-3 py-2.5">
+                  <div className="flex items-start gap-3">
+                    <button onClick={() => togglePaga(d.id)} className="mt-0.5 shrink-0" title={d.paga ? "Marcar como pendente" : "Marcar como paga"}>
+                      {d.paga ? <CheckCircle2 size={18} color={COR.verde} /> : <Circle size={18} color={COR.tintaSuave} />}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className="text-sm font-medium break-words"
+                        style={{ textDecoration: d.paga ? "line-through" : "none", color: d.paga ? COR.tintaSuave : COR.tinta }}
+                      >
+                        {d.descricao}
+                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: corCategoria(d.categoria) + "22", color: corCategoria(d.categoria) }}>
+                          {d.categoria}
                         </span>
-                      )}
+                        <span className="text-xs" style={{ color: COR.tintaSuave }}>
+                          Vence em {new Date(d.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                        {!d.paga && d.vencimento < hojeISO() && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#F8D9DF", color: COR.vermelho }}>
+                            Atrasada
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center justify-between mt-2 pl-7">
                     <span className="fonte-mono text-sm font-semibold">{fmt(d.valor)}</span>
-                    <button onClick={() => iniciarEdicao(d)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
-                    <BotaoExcluirConfirmar onConfirmar={() => excluir(d.id)} />
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => iniciarEdicao(d)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
+                      <BotaoExcluirConfirmar onConfirmar={() => excluir(d.id)} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -1772,7 +1776,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       )}
 
       {linhasMes.length > 0 && (
-        <div className="rounded-lg oculta-impressao overflow-y-auto max-h-96" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-lg oculta-impressao overflow-y-auto max-h-96" style={{ background: "white", border: `1px solid ${COR.linha}`, paddingBottom: 64 }}>
           {linhasMes.map((c, i) => (
             <div key={c.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === c.id ? (
@@ -1809,8 +1813,8 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between px-3 py-2.5">
-                  <div className="min-w-0 flex items-start gap-2">
+                <div className="px-3 py-2.5">
+                  <div className="flex items-start gap-2">
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5"
                       style={{
@@ -1820,14 +1824,14 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     >
                       {c.nome}
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{c.compra}</p>
-                    </div>
+                    <p className="text-sm font-medium break-words min-w-0 flex-1">{c.compra}</p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center justify-between mt-2">
                     <span className="fonte-mono text-sm font-semibold">{fmt(c.valor)}</span>
-                    <button onClick={() => iniciarEdicao(c)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
-                    <BotaoExcluirConfirmar onConfirmar={() => excluir(c.id)} />
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => iniciarEdicao(c)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
+                      <BotaoExcluirConfirmar onConfirmar={() => excluir(c.id)} />
+                    </div>
                   </div>
                 </div>
               )}
