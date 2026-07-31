@@ -114,12 +114,6 @@ const valorMascaradoParaNumero = (mascarado) => {
   return parseFloat(limpo);
 };
 
-// Detecta se o app está rodando "instalado" (tela cheia, sem barra do navegador) — nesse modo,
-// o popup de login não funciona, então usamos redirecionamento em vez de popup.
-const emModoInstalado = () =>
-  typeof window !== "undefined" &&
-  (window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator?.standalone === true);
-
 const mesAtualChave = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -237,7 +231,7 @@ function TelaCarregando() {
 }
 
 // -------- tela de login --------
-function TelaLogin() {
+function TelaLogin({ erroInicial }) {
   const [tela, setTela] = useState("login"); // "login" | "cadastro" | "recuperar"
 
   const [email, setEmail] = useState("");
@@ -252,6 +246,10 @@ function TelaLogin() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
+
+  useEffect(() => {
+    if (erroInicial) setErro(erroInicial);
+  }, [erroInicial]);
 
   const irPara = (novaTela) => {
     setErro(""); setMensagem("");
@@ -298,18 +296,23 @@ function TelaLogin() {
   const entrarComGoogle = async () => {
     setErro(""); setMensagem("");
     setCarregando(true);
+    const codigosCancelamento = ["auth/popup-closed-by-user", "auth/cancelled-popup-request"];
     try {
-      if (emModoInstalado()) {
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        await signInWithPopup(auth, googleProvider);
-      }
-    } catch (e) {
-      if (e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") {
-        setErro(mensagemErroAuth(e.code));
-      }
-    } finally {
+      await signInWithPopup(auth, googleProvider);
       setCarregando(false);
+    } catch (erroPopup) {
+      if (codigosCancelamento.includes(erroPopup.code)) {
+        setCarregando(false);
+        return;
+      }
+      // popup não é suportado neste ambiente (ex: app instalado na tela inicial) — tenta redirecionamento
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        // não desliga "carregando" aqui: a página vai navegar embora antes de terminar
+      } catch (erroRedirect) {
+        setErro(mensagemErroAuth(erroRedirect.code));
+        setCarregando(false);
+      }
     }
   };
 
@@ -703,10 +706,11 @@ function BotaoExcluirConfirmar({ onConfirmar }) {
 
 export default function App() {
   const [usuario, setUsuario] = useState(undefined); // undefined = verificando, null = deslogado, objeto = logado
+  const [erroRedirecionamento, setErroRedirecionamento] = useState("");
 
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (u) => setUsuario(u));
-    getRedirectResult(auth).catch(() => {});
+    getRedirectResult(auth).catch((e) => setErroRedirecionamento(mensagemErroAuth(e.code)));
     return cancelar;
   }, []);
 
@@ -717,7 +721,7 @@ export default function App() {
   }
 
   if (usuario === undefined) return <TelaCarregando />;
-  if (usuario === null) return <TelaLogin />;
+  if (usuario === null) return <TelaLogin erroInicial={erroRedirecionamento} />;
   return <MeuCaixaApp usuario={usuario} />;
 }
 
