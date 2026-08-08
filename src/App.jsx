@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
-  ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete,
+  ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, TrendingUp,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
@@ -160,10 +160,9 @@ function useLocalStorageState(chave, valorInicial) {
   return [valor, setValor];
 }
 
-const DADOS_PADRAO_NUVEM = { despesas: [], cartoes: CARTOES_PADRAO, pessoasAutomaticas: ["Jefferson"] };
+const DADOS_PADRAO_NUVEM = { despesas: [], receitas: [], cartoes: CARTOES_PADRAO, pessoasAutomaticas: ["Jefferson"], pagamentosCartaoPagos: {} };
 
-// Guarda despesas, cartões e pessoas automáticas no Firestore, num documento por usuário logado.
-// Funciona como um useState normal (aceita função atualizadora) pra minimizar mudanças no resto do app.
+// Guarda despesas, receitas, cartões e pessoas automáticas no Firestore, num documento por usuário logado.
 function useDadosNuvem(uid) {
   const [dados, setDadosLocal] = useState(DADOS_PADRAO_NUVEM);
   const [carregando, setCarregando] = useState(true);
@@ -201,10 +200,14 @@ function useDadosNuvem(uid) {
   return {
     despesas: dados.despesas,
     setDespesas: criarSetter("despesas"),
+    receitas: dados.receitas,
+    setReceitas: criarSetter("receitas"),
     cartoes: dados.cartoes,
     setCartoes: criarSetter("cartoes"),
     pessoasAutomaticas: dados.pessoasAutomaticas,
     setPessoasAutomaticas: criarSetter("pessoasAutomaticas"),
+    pagamentosCartaoPagos: dados.pagamentosCartaoPagos,
+    setPagamentosCartaoPagos: criarSetter("pagamentosCartaoPagos"),
     carregando,
   };
 }
@@ -230,7 +233,6 @@ function TelaCarregando() {
   );
 }
 
-// -------- tela de login --------
 function TelaLogin({ erroInicial }) {
   const [tela, setTela] = useState("login"); // "login" | "cadastro" | "recuperar"
 
@@ -727,11 +729,11 @@ export default function App() {
 
 function MeuCaixaApp({ usuario }) {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
-  const { despesas, setDespesas, cartoes, setCartoes, pessoasAutomaticas, setPessoasAutomaticas, carregando } = useDadosNuvem(usuario.uid);
+  const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pessoasAutomaticas, setPessoasAutomaticas, pagamentosCartaoPagos, setPagamentosCartaoPagos, carregando } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
 
-  const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
+  const abas = ["despesas", "receitas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
   const indiceAba = indiceAbaBruto === -1 ? 0 : indiceAbaBruto;
 
@@ -844,8 +846,8 @@ function MeuCaixaApp({ usuario }) {
   };
 
   const cartaoAtivo = cartoes.find((c) => `cartao-${c.id}` === aba);
-  const acento = aba === "despesas" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
-  const acentoClaro = aba === "despesas" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
+  const acento = aba === "despesas" ? COR.ouro : aba === "receitas" ? COR.verde : cartaoAtivo?.cor || COR.roxo;
+  const acentoClaro = aba === "despesas" ? COR.ouroClaro : aba === "receitas" ? COR.verdeClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
   if (carregando) return <TelaCarregando />;
 
@@ -887,12 +889,13 @@ function MeuCaixaApp({ usuario }) {
                   )}
                 </button>
                 {mostrarMenuUsuario && (
-                  <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: "white", minWidth: 190, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                  <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: "white", minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
                     <p className="text-xs font-semibold truncate" style={{ color: COR.tinta }}>{usuario.displayName || "Usuário"}</p>
-                    <p className="text-[11px] truncate mb-2" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
+                    <p className="text-[11px] truncate mb-3" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
+
                     <button
                       onClick={() => { setMostrarMenuUsuario(false); signOut(auth); }}
-                      className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1"
+                      className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1 mt-1"
                       style={{ color: COR.vermelho }}
                     >
                       <LogOut size={13} /> Sair da conta
@@ -910,6 +913,13 @@ function MeuCaixaApp({ usuario }) {
               style={{ background: aba === "despesas" ? COR.papel : "transparent", color: aba === "despesas" ? COR.tinta : "#9AA1B4" }}
             >
               <Wallet size={15} /> Despesas
+            </button>
+            <button
+              onClick={() => setAba("receitas")}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
+              style={{ background: aba === "receitas" ? COR.papel : "transparent", color: aba === "receitas" ? COR.tinta : "#9AA1B4" }}
+            >
+              <TrendingUp size={15} /> Receitas
             </button>
             {cartoes.map((c) => {
               const ativo = aba === `cartao-${c.id}`;
@@ -987,6 +997,15 @@ function MeuCaixaApp({ usuario }) {
               pessoasAutomaticas={pessoasAutomaticas}
               adicionarPessoaAutomatica={adicionarPessoaAutomatica}
               removerPessoaAutomatica={removerPessoaAutomatica}
+              pagamentosCartaoPagos={pagamentosCartaoPagos}
+              onAtualizarPagamentosCartao={setPagamentosCartaoPagos}
+            />
+          </div>
+          <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
+            <ReceitasTab
+              receitas={receitas}
+              onAtualizarReceitas={setReceitas}
+              despesas={despesas}
             />
           </div>
           {cartoes.map((cartao) => (
@@ -1215,8 +1234,204 @@ function Calculadora({ aberta, aoFechar }) {
   );
 }
 
+// ===================== ABA RECEITAS =====================
+function ReceitasTab({ receitas, onAtualizarReceitas, despesas }) {
+  const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [nova, setNova] = useState({ pessoa: "", descricao: "", valor: "", mes: mesAtualChave() });
+  const [editandoId, setEditandoId] = useState(null);
+  const [rascunho, setRascunho] = useState(null);
+
+  const receitasPorMes = useMemo(() => {
+    const grupos = {};
+    for (const r of receitas) {
+      const chave = r.mes;
+      (grupos[chave] ||= []).push(r);
+    }
+    return grupos;
+  }, [receitas]);
+
+  const despesasPorMes = useMemo(() => {
+    const grupos = {};
+    for (const d of despesas) {
+      const chave = chaveDoMes(d.vencimento);
+      (grupos[chave] ||= []).push(d);
+    }
+    return grupos;
+  }, [despesas]);
+
+  const chaves = useMemo(() => {
+    const conjunto = new Set([...Object.keys(receitasPorMes), ...Object.keys(despesasPorMes)]);
+    return [...conjunto].sort();
+  }, [receitasPorMes, despesasPorMes]);
+
+  const meses = useMemo(() => preencherIntervaloMeses(chaves), [chaves]);
+
+  const linhas = receitasPorMes[mesSelecionado] || [];
+  const totalMes = linhas.reduce((s, r) => s + r.valor, 0);
+  const totalDespesasMes = (despesasPorMes[mesSelecionado] || []).reduce((s, d) => s + d.valor, 0);
+  const saldo = totalMes - totalDespesasMes;
+
+  const adicionar = () => {
+    const valor = valorMascaradoParaNumero(nova.valor);
+    if (!nova.pessoa.trim() || !nova.descricao.trim() || !(valor > 0) || !nova.mes) return;
+    const novaReceita = { id: uid(), pessoa: nova.pessoa.trim(), descricao: nova.descricao.trim(), valor, mes: nova.mes };
+    onAtualizarReceitas([...receitas, novaReceita]);
+    setNova({ pessoa: "", descricao: "", valor: "", mes: nova.mes });
+    setMostrarForm(false);
+    setMesSelecionado(novaReceita.mes);
+  };
+
+  const iniciarEdicao = (r) => { setEditandoId(r.id); setRascunho({ ...r, valor: formatarValorDigitado(String(Math.round(r.valor * 100))) }); };
+
+  const salvarEdicao = () => {
+    const valor = valorMascaradoParaNumero(rascunho.valor);
+    if (!rascunho.pessoa.trim() || !rascunho.descricao.trim() || !(valor > 0) || !rascunho.mes) return;
+    onAtualizarReceitas(receitas.map((r) =>
+      r.id === editandoId
+        ? { ...r, pessoa: rascunho.pessoa.trim(), descricao: rascunho.descricao.trim(), valor, mes: rascunho.mes }
+        : r
+    ));
+    setEditandoId(null);
+    setRascunho(null);
+  };
+
+  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
+  const excluir = (id) => onAtualizarReceitas(receitas.filter((r) => r.id !== id));
+
+  return (
+    <div className="flex flex-col gap-6">
+      <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={COR.verde} />
+
+      <div className="relative rounded-md px-5 py-4" style={{ background: COR.tinta }}>
+        <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.verdeClaro }}>
+          Total de receitas — {rotuloDoMes(mesSelecionado)}
+        </p>
+        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: "white" }}>{fmt(totalMes)}</p>
+        <p className="text-xs mt-1" style={{ color: saldo >= 0 ? "#8FD9B6" : "#F5A3A3" }}>
+          Saldo do mês (receitas − despesas): <span className="fonte-mono">{fmt(saldo)}</span>
+        </p>
+      </div>
+
+      <button
+        onClick={() => setMostrarForm((v) => !v)}
+        className="flex items-center justify-center gap-2 rounded-md py-2.5 text-sm font-semibold border-2 border-dashed transition-colors"
+        style={{ borderColor: COR.verde, color: COR.verde }}
+      >
+        <Plus size={16} /> Adicionar receita
+      </button>
+
+      {mostrarForm && (
+        <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+          <Campo label="Recebido por">
+            <input
+              className={inputBase} style={{ borderColor: COR.linha }}
+              placeholder="Ex: Jefferson"
+              value={nova.pessoa}
+              onChange={(e) => setNova({ ...nova, pessoa: e.target.value })}
+            />
+          </Campo>
+          <Campo label="Descrição">
+            <input
+              className={inputBase} style={{ borderColor: COR.linha }}
+              placeholder="Ex: Salário, freelance, 13º..."
+              value={nova.descricao}
+              onChange={(e) => setNova({ ...nova, descricao: e.target.value })}
+            />
+          </Campo>
+          <Campo label="Mês">
+            <input
+              className={inputBase} style={{ borderColor: COR.linha }}
+              type="month"
+              value={nova.mes}
+              onChange={(e) => setNova({ ...nova, mes: e.target.value })}
+            />
+          </Campo>
+          <Campo label="Valor (R$)">
+            <input
+              className={inputBase} style={{ borderColor: COR.linha }}
+              type="text" inputMode="numeric" placeholder="0,00"
+              value={nova.valor}
+              onChange={(e) => setNova({ ...nova, valor: formatarValorDigitado(e.target.value) })}
+            />
+          </Campo>
+          <div className="flex gap-2 justify-end mt-1">
+            <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
+              Cancelar
+            </button>
+            <button onClick={adicionar} className="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style={{ background: COR.verde }}>
+              Salvar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {linhas.length === 0 && !mostrarForm && (
+        <p className="text-sm text-center py-8" style={{ color: COR.tintaSuave }}>
+          Nenhuma receita em {rotuloDoMes(mesSelecionado)} ainda.
+        </p>
+      )}
+
+      {linhas.length > 0 && (
+        <div className="rounded-lg overflow-hidden" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+          {linhas.map((r, i) => (
+            <div key={r.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
+              {editandoId === r.id ? (
+                <div className="p-3 flex flex-col gap-2" style={{ background: COR.papelEscuro }}>
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    value={rascunho.pessoa}
+                    onChange={(e) => setRascunho({ ...rascunho, pessoa: e.target.value })}
+                  />
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    value={rascunho.descricao}
+                    onChange={(e) => setRascunho({ ...rascunho, descricao: e.target.value })}
+                  />
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    type="month"
+                    value={rascunho.mes}
+                    onChange={(e) => setRascunho({ ...rascunho, mes: e.target.value })}
+                  />
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    type="text" inputMode="numeric"
+                    value={rascunho.valor}
+                    onChange={(e) => setRascunho({ ...rascunho, valor: formatarValorDigitado(e.target.value) })}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={cancelarEdicao} className="p-1.5 rounded-md" style={{ color: COR.tintaSuave }}><X size={16} /></button>
+                    <button onClick={salvarEdicao} className="p-1.5 rounded-md text-white" style={{ background: COR.verde }}><Check size={16} /></button>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mt-0.5" style={{ background: COR.verdeClaro, color: COR.verde }}>
+                      {r.pessoa}
+                    </span>
+                    <p className="text-sm font-medium break-words min-w-0 flex-1">{r.descricao}</p>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="fonte-mono text-sm font-semibold">{fmt(r.valor)}</span>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => iniciarEdicao(r)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
+                      <BotaoExcluirConfirmar onConfirmar={() => excluir(r.id)} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===================== ABA DESPESAS =====================
-function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, adicionarPessoaAutomatica, removerPessoaAutomatica }) {
+function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, adicionarPessoaAutomatica, removerPessoaAutomatica, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
@@ -1243,6 +1458,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
   }), [cartoes]);
 
   const fontesCartao = useMemo(() => cartoesComAgrupamento.map((c) => ({
+    id: c.id,
     label: c.nome,
     cor: c.cor,
     corClara: c.corClara,
@@ -1262,12 +1478,23 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
   const meses = useMemo(() => preencherIntervaloMeses(chaves), [chaves]);
 
   const linhas = despesasPorMes[mesSelecionado] || [];
-  const totaisCartoes = fontesCartao.map((f) => ({ ...f, total: f.totalPorMes(mesSelecionado) }));
+  const totaisCartoes = fontesCartao.map((f) => ({
+    ...f,
+    total: f.totalPorMes(mesSelecionado),
+    chavePagamento: `${f.id}-${mesSelecionado}`,
+    pago: !!pagamentosCartaoPagos[`${f.id}-${mesSelecionado}`],
+  }));
   const somaCartoes = totaisCartoes.reduce((s, f) => s + f.total, 0);
   const totalDespesasMes = linhas.reduce((s, d) => s + d.valor, 0);
   const totalMes = totalDespesasMes + somaCartoes;
-  const totalPago = linhas.filter((d) => d.paga).reduce((s, d) => s + d.valor, 0);
-  const totalPendente = totalDespesasMes - totalPago;
+  const totalPagoDespesas = linhas.filter((d) => d.paga).reduce((s, d) => s + d.valor, 0);
+  const totalPagoCartoes = totaisCartoes.filter((f) => f.total > 0 && f.pago).reduce((s, f) => s + f.total, 0);
+  const totalPago = totalPagoDespesas + totalPagoCartoes;
+  const totalPendente = totalMes - totalPago;
+
+  const toggleCartaoPago = (chave) => {
+    onAtualizarPagamentosCartao((prev) => ({ ...prev, [chave]: !prev[chave] }));
+  };
 
   const dadosGrafico = useMemo(() => chaves.slice(-12).map((chave) => {
     const totalD = (despesasPorMes[chave] || []).reduce((s, d) => s + d.valor, 0);
@@ -1493,18 +1720,30 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
           ))}
 
           {totaisCartoes.filter((f) => f.total > 0).map((f, idx) => (
-            <div
-              key={f.label}
-              className="flex items-center justify-between px-3 py-2.5"
-              style={{ borderTop: (linhas.length || idx > 0) ? `1px solid ${COR.linha}` : "none", background: f.corClara }}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <ArrowRight size={13} color={f.cor} />
-                <p className="text-sm font-medium truncate" style={{ color: f.cor }}>
-                  {f.label} — soma automática
-                </p>
+            <div key={f.id} style={{ borderTop: (linhas.length || idx > 0) ? `1px solid ${COR.linha}` : "none" }}>
+              <div className="px-3 py-2.5">
+                <div className="flex items-start gap-3">
+                  <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-0.5 shrink-0" title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
+                    {f.pago ? <CheckCircle2 size={18} color={COR.verde} /> : <Circle size={18} color={COR.tintaSuave} />}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-sm font-medium break-words"
+                      style={{ textDecoration: f.pago ? "line-through" : "none", color: f.pago ? COR.tintaSuave : COR.tinta }}
+                    >
+                      {f.label} — soma automática
+                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1" style={{ background: f.corClara, color: f.cor }}>
+                        <ArrowRight size={10} /> Cartão
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-2 pl-7">
+                  <span className="fonte-mono text-sm font-semibold" style={{ color: f.cor }}>{fmt(f.total)}</span>
+                </div>
               </div>
-              <span className="fonte-mono text-sm font-semibold" style={{ color: f.cor }}>{fmt(f.total)}</span>
             </div>
           ))}
         </div>
