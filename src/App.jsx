@@ -53,6 +53,8 @@ const COR = {
   verde: "#2E7D5B",
   verdeClaro: "#DCEEE3",
   vermelho: "#A83232",
+  cartao: "#FFFFFF",
+  texto: "#1C2333",
 };
 
 const CATEGORIAS = ["Moradia", "Alimentação", "Transporte", "Saúde", "Lazer", "Educação", "Assinaturas", "Outros"];
@@ -160,7 +162,12 @@ function useLocalStorageState(chave, valorInicial) {
   return [valor, setValor];
 }
 
-const DADOS_PADRAO_NUVEM = { despesas: [], cartoes: CARTOES_PADRAO, pessoasAutomaticas: ["Jefferson"], pagamentosCartaoPagos: {} };
+const DADOS_PADRAO_NUVEM = {
+  despesas: [],
+  cartoes: CARTOES_PADRAO,
+  pessoasAutomaticas: ["Jefferson"],
+  pagamentosCartaoPagos: {},
+};
 
 // Guarda despesas, cartões e pessoas automáticas no Firestore, num documento por usuário logado.
 function useDadosNuvem(uid) {
@@ -852,7 +859,7 @@ function MeuCaixaApp({ usuario }) {
   return (
     <div
       className="min-h-screen w-full"
-      style={{ background: COR.papel, color: COR.tinta, fontFamily: "'Inter', ui-sans-serif, system-ui" }}
+      style={{ background: COR.papel, color: COR.texto, fontFamily: "'Inter', ui-sans-serif, system-ui" }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
@@ -881,19 +888,19 @@ function MeuCaixaApp({ usuario }) {
                   {usuario.photoURL ? (
                     <img src={usuario.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <span className="flex items-center justify-center w-full h-full text-xs font-bold" style={{ background: COR.ouro, color: COR.tinta }}>
+                    <span className="flex items-center justify-center w-full h-full text-xs font-bold" style={{ background: COR.ouro, color: COR.texto }}>
                       {(usuario.displayName || usuario.email || "?").charAt(0).toUpperCase()}
                     </span>
                   )}
                 </button>
                 {mostrarMenuUsuario && (
-                  <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: "white", minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
-                    <p className="text-xs font-semibold truncate" style={{ color: COR.tinta }}>{usuario.displayName || "Usuário"}</p>
+                  <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: COR.cartao, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                    <p className="text-xs font-semibold truncate" style={{ color: COR.texto }}>{usuario.displayName || "Usuário"}</p>
                     <p className="text-[11px] truncate mb-3" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
 
                     <button
                       onClick={() => { setMostrarMenuUsuario(false); signOut(auth); }}
-                      className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1 mt-1"
+                      className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1.5"
                       style={{ color: COR.vermelho }}
                     >
                       <LogOut size={13} /> Sair da conta
@@ -1027,8 +1034,8 @@ function MeuCaixaApp({ usuario }) {
           style={{ background: "rgba(28,35,51,0.6)" }}
           onClick={() => setCartaoParaExcluir(null)}
         >
-          <div className="rounded-lg p-5 max-w-sm w-full" style={{ background: "white" }} onClick={(e) => e.stopPropagation()}>
-            <p className="fonte-display text-lg mb-2" style={{ color: COR.tinta }}>
+          <div className="rounded-lg p-5 max-w-sm w-full" style={{ background: COR.cartao }} onClick={(e) => e.stopPropagation()}>
+            <p className="fonte-display text-lg mb-2" style={{ color: COR.texto }}>
               Excluir {cartaoParaExcluir.nome}?
             </p>
             <p className="text-sm mb-5" style={{ color: COR.tintaSuave }}>
@@ -1152,8 +1159,8 @@ function Calculadora({ aberta, aoFechar }) {
 
   const BotaoCalc = ({ children, onClick, cor = "numero", className = "" }) => {
     const estilos = {
-      numero: { background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` },
-      funcao: { background: COR.papelEscuro, color: COR.tinta },
+      numero: { background: COR.cartao, color: COR.texto, border: `1px solid ${COR.linha}` },
+      funcao: { background: COR.papelEscuro, color: COR.texto },
       operador: { background: COR.ouro, color: "white" },
       igual: { background: COR.tinta, color: COR.ouroClaro },
     };
@@ -1345,7 +1352,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
         )}
       </div>
 
-      <div className="rounded-lg p-3 flex flex-col gap-2" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+      <div className="rounded-lg p-3 flex flex-col gap-2" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
         <p className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: COR.tintaSuave }}>
           Pessoas com soma automática nos cartões
         </p>
@@ -1354,7 +1361,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
             <span className="text-xs" style={{ color: COR.tintaSuave }}>Nenhuma pessoa configurada.</span>
           )}
           {pessoasAutomaticas.map((p) => (
-            <span key={p} className="flex items-center gap-1 text-xs font-medium pl-2 pr-1 py-1 rounded-full" style={{ background: COR.papelEscuro, color: COR.tinta }}>
+            <span key={p} className="flex items-center gap-1 text-xs font-medium pl-2 pr-1 py-1 rounded-full" style={{ background: COR.papelEscuro, color: COR.texto }}>
               {p}
               <button onClick={() => removerPessoaAutomatica(p)} style={{ color: COR.vermelho }}><X size={11} /></button>
             </span>
@@ -1382,7 +1389,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
       </button>
 
       {mostrarForm && (
-        <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <Campo label="Descrição">
             <input
               className={inputBase}
@@ -1437,7 +1444,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
       )}
 
       {(linhas.length > 0 || somaCartoes > 0) && (
-        <div className="rounded-lg overflow-hidden" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           {linhas.map((d, i) => (
             <div key={d.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === d.id ? (
@@ -1538,8 +1545,8 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
       )}
 
       {dadosGrafico.length > 0 && (
-        <div className="rounded-lg p-4" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
-          <p className="text-sm font-semibold mb-3" style={{ color: COR.tinta }}>Evolução mensal</p>
+        <div className="rounded-lg p-4" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+          <p className="text-sm font-semibold mb-3" style={{ color: COR.texto }}>Evolução mensal</p>
           <div style={{ width: "100%", height: 200 }}>
             <ResponsiveContainer>
               <BarChart data={dadosGrafico}>
@@ -1709,7 +1716,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       </button>
 
       {mostrarForm && (
-        <div className="rounded-lg p-4 flex flex-col gap-3 oculta-impressao" style={{ background: "white", border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-lg p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <Campo label="Nome de quem comprou">
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
@@ -1807,7 +1814,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       )}
 
       {linhasMes.length > 0 && (
-        <div className="rounded-lg oculta-impressao overflow-y-auto max-h-96" style={{ background: "white", border: `1px solid ${COR.linha}`, paddingBottom: 64 }}>
+        <div className="rounded-lg oculta-impressao overflow-y-auto max-h-96" style={{ background: COR.cartao, border: `1px solid ${COR.linha}`, paddingBottom: 64 }}>
           {linhasMes.map((c, i) => (
             <div key={c.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === c.id ? (
