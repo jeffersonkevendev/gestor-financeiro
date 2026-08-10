@@ -165,11 +165,10 @@ function useLocalStorageState(chave, valorInicial) {
 const DADOS_PADRAO_NUVEM = {
   despesas: [],
   cartoes: CARTOES_PADRAO,
-  pessoasAutomaticas: ["Jefferson"],
   pagamentosCartaoPagos: {},
 };
 
-// Guarda despesas, cartões e pessoas automáticas no Firestore, num documento por usuário logado.
+// Guarda despesas, cartões e pagamentos no Firestore, num documento por usuário logado.
 function useDadosNuvem(uid) {
   const [dados, setDadosLocal] = useState(DADOS_PADRAO_NUVEM);
   const [carregando, setCarregando] = useState(true);
@@ -209,8 +208,6 @@ function useDadosNuvem(uid) {
     setDespesas: criarSetter("despesas"),
     cartoes: dados.cartoes,
     setCartoes: criarSetter("cartoes"),
-    pessoasAutomaticas: dados.pessoasAutomaticas,
-    setPessoasAutomaticas: criarSetter("pessoasAutomaticas"),
     pagamentosCartaoPagos: dados.pagamentosCartaoPagos,
     setPagamentosCartaoPagos: criarSetter("pagamentosCartaoPagos"),
     carregando,
@@ -734,9 +731,13 @@ export default function App() {
 
 function MeuCaixaApp({ usuario }) {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
-  const { despesas, setDespesas, cartoes, setCartoes, pessoasAutomaticas, setPessoasAutomaticas, pagamentosCartaoPagos, setPagamentosCartaoPagos, carregando } = useDadosNuvem(usuario.uid);
+  const { despesas, setDespesas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, carregando } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
+
+  // A soma automática nos cartões usa o nome de quem está logado — sem precisar configurar nada.
+  const nomeDoUsuario = (usuario.displayName || usuario.email || "").trim();
+  const pessoasAutomaticas = useMemo(() => (nomeDoUsuario ? [nomeDoUsuario] : []), [nomeDoUsuario]);
 
   const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
@@ -801,14 +802,6 @@ function MeuCaixaApp({ usuario }) {
     excluirCartao(cartaoParaExcluir.id);
     setCartaoParaExcluir(null);
   };
-
-  // ---------- pessoas com soma automática ----------
-  const adicionarPessoaAutomatica = (nome) => {
-    const limpo = nome.trim();
-    if (!limpo) return;
-    setPessoasAutomaticas((prev) => (prev.some((p) => p.toLowerCase() === limpo.toLowerCase()) ? prev : [...prev, limpo]));
-  };
-  const removerPessoaAutomatica = (nome) => setPessoasAutomaticas((prev) => prev.filter((p) => p !== nome));
 
   // ---------- exportar dados ----------
   const exportarDados = () => {
@@ -993,8 +986,6 @@ function MeuCaixaApp({ usuario }) {
               onAtualizarDespesas={setDespesas}
               cartoes={cartoes}
               pessoasAutomaticas={pessoasAutomaticas}
-              adicionarPessoaAutomatica={adicionarPessoaAutomatica}
-              removerPessoaAutomatica={removerPessoaAutomatica}
               pagamentosCartaoPagos={pagamentosCartaoPagos}
               onAtualizarPagamentosCartao={setPagamentosCartaoPagos}
             />
@@ -1226,13 +1217,12 @@ function Calculadora({ aberta, aoFechar }) {
 }
 
 // ===================== ABA DESPESAS =====================
-function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, adicionarPessoaAutomatica, removerPessoaAutomatica, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
+function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
-  const [novaPessoa, setNovaPessoa] = useState("");
 
   const despesasPorMes = useMemo(() => {
     const grupos = {};
@@ -1326,8 +1316,6 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
   const excluir = (id) => onAtualizarDespesas(despesas.filter((d) => d.id !== id));
   const togglePaga = (id) => onAtualizarDespesas(despesas.map((d) => (d.id === id ? { ...d, paga: !d.paga } : d)));
 
-  const confirmarAdicionarPessoa = () => { adicionarPessoaAutomatica(novaPessoa); setNovaPessoa(""); };
-
   return (
     <div className="flex flex-col gap-6">
       <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={COR.ouro} />
@@ -1350,34 +1338,6 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
             Pago: <span className="fonte-mono">{fmt(totalPago)}</span> · Pendente: <span className="fonte-mono">{fmt(totalPendente)}</span>
           </p>
         )}
-      </div>
-
-      <div className="rounded-lg p-3 flex flex-col gap-2" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
-        <p className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: COR.tintaSuave }}>
-          Pessoas com soma automática nos cartões
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {pessoasAutomaticas.length === 0 && (
-            <span className="text-xs" style={{ color: COR.tintaSuave }}>Nenhuma pessoa configurada.</span>
-          )}
-          {pessoasAutomaticas.map((p) => (
-            <span key={p} className="flex items-center gap-1 text-xs font-medium pl-2 pr-1 py-1 rounded-full" style={{ background: COR.papelEscuro, color: COR.texto }}>
-              {p}
-              <button onClick={() => removerPessoaAutomatica(p)} style={{ color: COR.vermelho }}><X size={11} /></button>
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={novaPessoa}
-            onChange={(e) => setNovaPessoa(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") confirmarAdicionarPessoa(); }}
-            placeholder="Adicionar pessoa..."
-            className={inputBase + " flex-1"}
-            style={{ borderColor: COR.linha }}
-          />
-          <button onClick={confirmarAdicionarPessoa} className="px-4 rounded-md text-sm font-semibold text-white" style={{ background: COR.ouro }}>+</button>
-        </div>
       </div>
 
       <button
