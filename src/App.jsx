@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
-  ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete,
+  ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
@@ -730,7 +730,7 @@ export default function App() {
 }
 
 function MeuCaixaApp({ usuario }) {
-  const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "despesas");
+  const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "inicio");
   const { despesas, setDespesas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, carregando } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
@@ -745,7 +745,7 @@ function MeuCaixaApp({ usuario }) {
     return [...nomes];
   }, [nomeDoUsuario, primeiroNomeDoUsuario]);
 
-  const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
+  const abas = ["inicio", "despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
   const indiceAba = indiceAbaBruto === -1 ? 0 : indiceAbaBruto;
 
@@ -850,8 +850,8 @@ function MeuCaixaApp({ usuario }) {
   };
 
   const cartaoAtivo = cartoes.find((c) => `cartao-${c.id}` === aba);
-  const acento = aba === "despesas" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
-  const acentoClaro = aba === "despesas" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
+  const acento = aba === "despesas" || aba === "inicio" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
+  const acentoClaro = aba === "despesas" || aba === "inicio" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
   if (carregando) return <TelaCarregando />;
 
@@ -911,6 +911,13 @@ function MeuCaixaApp({ usuario }) {
           </div>
 
           <nav className="flex gap-1 items-center overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <button
+              onClick={() => setAba("inicio")}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
+              style={{ background: aba === "inicio" ? COR.papel : "transparent", color: aba === "inicio" ? COR.tinta : "#9AA1B4" }}
+            >
+              <Home size={15} /> Início
+            </button>
             <button
               onClick={() => setAba("despesas")}
               className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
@@ -986,6 +993,15 @@ function MeuCaixaApp({ usuario }) {
             transition: arrastandoRef.current ? "none" : "transform 0.25s ease",
           }}
         >
+          <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
+            <InicioTab
+              despesas={despesas}
+              cartoes={cartoes}
+              primeiroNome={primeiroNomeDoUsuario}
+              onIrPara={setAba}
+              onAbrirCalculadora={() => setMostrarCalculadora(true)}
+            />
+          </div>
           <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
             <DespesasTab
               despesas={despesas}
@@ -1218,6 +1234,77 @@ function Calculadora({ aberta, aoFechar }) {
           <BotaoCalc onClick={() => calcular()} cor="igual">=</BotaoCalc>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===================== ABA INÍCIO =====================
+function InicioTab({ despesas, cartoes, primeiroNome, onIrPara, onAbrirCalculadora }) {
+  const mesAtual = mesAtualChave();
+
+  const despesasMes = useMemo(() => despesas.filter((d) => chaveDoMes(d.vencimento) === mesAtual), [despesas, mesAtual]);
+  const totalDespesasMes = despesasMes.reduce((s, d) => s + d.valor, 0);
+  const totalPendenteMes = despesasMes.filter((d) => !d.paga).reduce((s, d) => s + d.valor, 0);
+
+  const cartoesComTotal = useMemo(() => cartoes.map((c) => ({
+    ...c,
+    totalMes: c.compras.filter((cp) => chaveDoMes(cp.data) === mesAtual).reduce((s, cp) => s + cp.valor, 0),
+  })), [cartoes, mesAtual]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="fonte-display text-2xl" style={{ color: COR.texto }}>
+          Olá{primeiroNome ? `, ${primeiroNome}` : ""}
+        </p>
+        <p className="text-sm" style={{ color: COR.tintaSuave }}>{rotuloDoMes(mesAtual)}</p>
+      </div>
+
+      <button
+        onClick={() => onIrPara("despesas")}
+        className="text-left rounded-md px-5 py-4"
+        style={{
+          background: COR.tinta,
+          backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 7px, ${COR.papel}22 7px, ${COR.papel}22 8px)`,
+        }}
+      >
+        <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>Despesas deste mês</p>
+        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalDespesasMes)}</p>
+        <p className="text-xs mt-1" style={{ color: "#9AA1B4" }}>
+          Pendente: <span className="fonte-mono">{fmt(totalPendenteMes)}</span>
+        </p>
+      </button>
+
+      <div>
+        <p className="text-sm font-semibold mb-2" style={{ color: COR.texto }}>Cartões</p>
+        <div className="flex flex-col gap-2">
+          {cartoesComTotal.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => onIrPara(`cartao-${c.id}`)}
+              className="flex items-center justify-between rounded-lg px-4 py-3"
+              style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.cor }} />
+                <span className="text-sm font-medium truncate" style={{ color: COR.texto }}>{c.nome}</span>
+              </div>
+              <span className="fonte-mono text-sm font-semibold shrink-0" style={{ color: c.cor }}>{fmt(c.totalMes)}</span>
+            </button>
+          ))}
+          {cartoesComTotal.length === 0 && (
+            <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado ainda.</p>
+          )}
+        </div>
+      </div>
+
+      <button
+        onClick={onAbrirCalculadora}
+        className="flex items-center justify-center gap-2 rounded-md py-3 text-sm font-semibold text-white"
+        style={{ background: COR.ouro }}
+      >
+        <IconeCalculadora size={16} /> Abrir calculadora
+      </button>
     </div>
   );
 }
