@@ -737,7 +737,13 @@ function MeuCaixaApp({ usuario }) {
 
   // A soma automática nos cartões usa o nome de quem está logado — sem precisar configurar nada.
   const nomeDoUsuario = (usuario.displayName || usuario.email || "").trim();
-  const pessoasAutomaticas = useMemo(() => (nomeDoUsuario ? [nomeDoUsuario] : []), [nomeDoUsuario]);
+  const primeiroNomeDoUsuario = nomeDoUsuario.split(/\s+/)[0] || "";
+  const pessoasAutomaticas = useMemo(() => {
+    const nomes = new Set();
+    if (nomeDoUsuario) nomes.add(nomeDoUsuario);
+    if (primeiroNomeDoUsuario) nomes.add(primeiroNomeDoUsuario);
+    return [...nomes];
+  }, [nomeDoUsuario, primeiroNomeDoUsuario]);
 
   const abas = ["despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
@@ -1310,6 +1316,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
     ));
     setEditandoId(null);
     setRascunho(null);
+    setMesSelecionado(chaveDoMes(rascunho.vencimento));
   };
 
   const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
@@ -1604,20 +1611,21 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
   const iniciarEdicao = (c) => {
     setEditandoId(c.id);
-    setRascunho({ ...c, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valor) * 100))), negativo: c.valor < 0 });
+    setRascunho({ ...c, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valor) * 100))), negativo: c.valor < 0, mes: chaveDoMes(c.data) });
   };
 
   const salvarEdicao = () => {
     const magnitude = valorMascaradoParaNumero(rascunho.valor);
-    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(magnitude > 0)) return;
+    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(magnitude > 0) || !rascunho.mes) return;
     const valor = rascunho.negativo ? -magnitude : magnitude;
     onAtualizarCompras(compras.map((c) =>
       c.id === editandoId
-        ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor }
+        ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor, data: `${rascunho.mes}-01` }
         : c
     ));
     setEditandoId(null);
     setRascunho(null);
+    setMesSelecionado(rascunho.mes);
   };
 
   const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
@@ -1788,6 +1796,12 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     className={inputBase} style={{ borderColor: COR.linha }}
                     value={rascunho.compra}
                     onChange={(e) => setRascunho({ ...rascunho, compra: e.target.value })}
+                  />
+                  <input
+                    className={inputBase} style={{ borderColor: COR.linha }}
+                    type="month"
+                    value={rascunho.mes}
+                    onChange={(e) => setRascunho({ ...rascunho, mes: e.target.value })}
                   />
                   <input
                     className={inputBase} style={{ borderColor: COR.linha }}
