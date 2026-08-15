@@ -997,6 +997,7 @@ function MeuCaixaApp({ usuario }) {
             <InicioTab
               despesas={despesas}
               cartoes={cartoes}
+              pessoasAutomaticas={pessoasAutomaticas}
               primeiroNome={primeiroNomeDoUsuario}
               onIrPara={setAba}
               onAbrirCalculadora={() => setMostrarCalculadora(true)}
@@ -1239,17 +1240,23 @@ function Calculadora({ aberta, aoFechar }) {
 }
 
 // ===================== ABA INÍCIO =====================
-function InicioTab({ despesas, cartoes, primeiroNome, onIrPara, onAbrirCalculadora }) {
+function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPara, onAbrirCalculadora }) {
   const mesAtual = mesAtualChave();
 
   const despesasMes = useMemo(() => despesas.filter((d) => chaveDoMes(d.vencimento) === mesAtual), [despesas, mesAtual]);
-  const totalDespesasMes = despesasMes.reduce((s, d) => s + d.valor, 0);
-  const totalPendenteMes = despesasMes.filter((d) => !d.paga).reduce((s, d) => s + d.valor, 0);
+  const totalDespesasReais = despesasMes.reduce((s, d) => s + d.valor, 0);
 
-  const cartoesComTotal = useMemo(() => cartoes.map((c) => ({
-    ...c,
-    totalMes: c.compras.filter((cp) => chaveDoMes(cp.data) === mesAtual).reduce((s, cp) => s + cp.valor, 0),
-  })), [cartoes, mesAtual]);
+  const cartoesComTotal = useMemo(() => cartoes.map((c) => {
+    const porMes = {};
+    for (const compra of c.compras) {
+      const chave = chaveDoMes(compra.data);
+      (porMes[chave] ||= []).push(compra);
+    }
+    return { ...c, totalMes: totalAutomaticoEmMes(porMes, mesAtual, pessoasAutomaticas) };
+  }), [cartoes, mesAtual, pessoasAutomaticas]);
+
+  const somaCartoesMes = cartoesComTotal.reduce((s, c) => s + c.totalMes, 0);
+  const totalGeralMes = totalDespesasReais + somaCartoesMes;
 
   return (
     <div className="flex flex-col gap-6">
@@ -1269,9 +1276,9 @@ function InicioTab({ despesas, cartoes, primeiroNome, onIrPara, onAbrirCalculado
         }}
       >
         <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>Despesas deste mês</p>
-        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalDespesasMes)}</p>
+        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalGeralMes)}</p>
         <p className="text-xs mt-1" style={{ color: "#9AA1B4" }}>
-          Pendente: <span className="fonte-mono">{fmt(totalPendenteMes)}</span>
+          Despesas: <span className="fonte-mono">{fmt(totalDespesasReais)}</span> · Cartões: <span className="fonte-mono">{fmt(somaCartoesMes)}</span>
         </p>
       </button>
 
