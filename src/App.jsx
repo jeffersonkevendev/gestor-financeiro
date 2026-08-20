@@ -3,6 +3,7 @@ import {
   Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
+  BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
@@ -94,6 +95,9 @@ const rotuloDoMes = (chave) => {
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+// Extrai só o primeiro nome — usado pra agrupar "Jefferson" e "Jefferson Keven" como a mesma pessoa no filtro.
+const primeiroNomeDe = (nome) => (nome || "").trim().split(/\s+/)[0] || "";
+
 const ehPessoaAutomatica = (nome, lista) =>
   lista.some((p) => p.trim().toLowerCase() === (nome || "").trim().toLowerCase());
 
@@ -164,11 +168,13 @@ function useLocalStorageState(chave, valorInicial) {
 
 const DADOS_PADRAO_NUVEM = {
   despesas: [],
+  receitas: [],
   cartoes: CARTOES_PADRAO,
   pagamentosCartaoPagos: {},
+  orcamentoMensal: 0,
 };
 
-// Guarda despesas, cartões e pagamentos no Firestore, num documento por usuário logado.
+// Guarda despesas, receitas, cartões, orçamento e pagamentos no Firestore, num documento por usuário logado.
 function useDadosNuvem(uid) {
   const [dados, setDadosLocal] = useState(DADOS_PADRAO_NUVEM);
   const [carregando, setCarregando] = useState(true);
@@ -206,10 +212,14 @@ function useDadosNuvem(uid) {
   return {
     despesas: dados.despesas,
     setDespesas: criarSetter("despesas"),
+    receitas: dados.receitas,
+    setReceitas: criarSetter("receitas"),
     cartoes: dados.cartoes,
     setCartoes: criarSetter("cartoes"),
     pagamentosCartaoPagos: dados.pagamentosCartaoPagos,
     setPagamentosCartaoPagos: criarSetter("pagamentosCartaoPagos"),
+    orcamentoMensal: dados.orcamentoMensal,
+    setOrcamentoMensal: criarSetter("orcamentoMensal"),
     carregando,
   };
 }
@@ -731,9 +741,13 @@ export default function App() {
 
 function MeuCaixaApp({ usuario }) {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "inicio");
-  const { despesas, setDespesas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, carregando } = useDadosNuvem(usuario.uid);
+  const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, orcamentoMensal, setOrcamentoMensal, carregando } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
+  const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState(null);
+  const [mostrarNovaReceita, setMostrarNovaReceita] = useState(false);
+  const [receitaEditando, setReceitaEditando] = useState(null);
+  const [mostrarOrcamento, setMostrarOrcamento] = useState(false);
 
   // A soma automática nos cartões usa o nome de quem está logado — sem precisar configurar nada.
   const nomeDoUsuario = (usuario.displayName || usuario.email || "").trim();
@@ -745,11 +759,11 @@ function MeuCaixaApp({ usuario }) {
     return [...nomes];
   }, [nomeDoUsuario, primeiroNomeDoUsuario]);
 
+  // ---------- navegação (abas deslizáveis) ----------
   const abas = ["inicio", "despesas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
   const indiceAba = indiceAbaBruto === -1 ? 0 : indiceAbaBruto;
 
-  // ---------- gesto de deslizar entre abas ----------
   const [arraste, setArraste] = useState(0);
   const arrastandoRef = useRef(false);
   const ignorarGestoRef = useRef(false);
@@ -782,6 +796,11 @@ function MeuCaixaApp({ usuario }) {
     setArraste(0);
   };
 
+  const irPara = (novaSecao) => {
+    setAba(novaSecao);
+    setCartaoSelecionadoId(null);
+  };
+
   // ---------- cartões (dinâmicos) ----------
   const [mostrarAddCartao, setMostrarAddCartao] = useState(false);
   const [nomeNovoCartao, setNomeNovoCartao] = useState("");
@@ -792,14 +811,14 @@ function MeuCaixaApp({ usuario }) {
     const id = uid();
     const paleta = corDoCartao(cartoes.length);
     setCartoes((prev) => [...prev, { id, nome, cor: paleta.cor, corClara: paleta.corClara, compras: [] }]);
-    setAba(`cartao-${id}`);
+    setCartaoSelecionadoId(id);
     setNomeNovoCartao("");
     setMostrarAddCartao(false);
   };
 
   const excluirCartao = (id) => {
     setCartoes((prev) => prev.filter((c) => c.id !== id));
-    setAba((atual) => (atual === `cartao-${id}` ? "despesas" : atual));
+    setCartaoSelecionadoId((atual) => (atual === id ? null : atual));
   };
 
   const [cartaoParaExcluir, setCartaoParaExcluir] = useState(null);
@@ -853,6 +872,18 @@ function MeuCaixaApp({ usuario }) {
   const acento = aba === "despesas" || aba === "inicio" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
   const acentoClaro = aba === "despesas" || aba === "inicio" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
+  // ---------- receitas ----------
+  const adicionarOuAtualizarReceita = (dadosReceita) => {
+    if (dadosReceita.id) {
+      setReceitas((prev) => prev.map((r) => (r.id === dadosReceita.id ? dadosReceita : r)));
+    } else {
+      setReceitas((prev) => [...prev, { ...dadosReceita, id: uid() }]);
+    }
+    setMostrarNovaReceita(false);
+    setReceitaEditando(null);
+  };
+  const excluirReceita = (id) => setReceitas((prev) => prev.filter((r) => r.id !== id));
+
   if (carregando) return <TelaCarregando />;
 
   return (
@@ -878,35 +909,38 @@ function MeuCaixaApp({ usuario }) {
               </div>
               <h1 className="fonte-display text-2xl" style={{ color: COR.papel }}>Meu Caixa</h1>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={exportarDados} className="p-2 rounded-full" style={{ color: "#9AA1B4" }} title="Exportar dados (backup)">
-                <Download size={18} />
-              </button>
-              <div className="relative">
-                <button onClick={() => setMostrarMenuUsuario((v) => !v)} className="w-8 h-8 rounded-full overflow-hidden border-2" style={{ borderColor: "#3a4257" }}>
-                  {usuario.photoURL ? (
-                    <img src={usuario.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className="flex items-center justify-center w-full h-full text-xs font-bold" style={{ background: COR.ouro, color: COR.texto }}>
-                      {(usuario.displayName || usuario.email || "?").charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </button>
-                {mostrarMenuUsuario && (
-                  <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: COR.cartao, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
-                    <p className="text-xs font-semibold truncate" style={{ color: COR.texto }}>{usuario.displayName || "Usuário"}</p>
-                    <p className="text-[11px] truncate mb-3" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
-
-                    <button
-                      onClick={() => { setMostrarMenuUsuario(false); signOut(auth); }}
-                      className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1.5"
-                      style={{ color: COR.vermelho }}
-                    >
-                      <LogOut size={13} /> Sair da conta
-                    </button>
-                  </div>
+            <div className="relative">
+              <button onClick={() => setMostrarMenuUsuario((v) => !v)} className="w-8 h-8 rounded-full overflow-hidden border-2" style={{ borderColor: "#3a4257" }}>
+                {usuario.photoURL ? (
+                  <img src={usuario.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="flex items-center justify-center w-full h-full text-xs font-bold" style={{ background: COR.ouro, color: COR.texto }}>
+                    {(usuario.displayName || usuario.email || "?").charAt(0).toUpperCase()}
+                  </span>
                 )}
-              </div>
+              </button>
+              {mostrarMenuUsuario && (
+                <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: COR.cartao, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                  <p className="text-xs font-semibold truncate" style={{ color: COR.texto }}>{usuario.displayName || "Usuário"}</p>
+                  <p className="text-[11px] truncate mb-3" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
+
+                  <button
+                    onClick={() => { setMostrarMenuUsuario(false); exportarDados(); }}
+                    className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1.5"
+                    style={{ color: COR.texto }}
+                  >
+                    <Download size={13} /> Exportar dados
+                  </button>
+
+                  <button
+                    onClick={() => { setMostrarMenuUsuario(false); signOut(auth); }}
+                    className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1.5"
+                    style={{ color: COR.vermelho }}
+                  >
+                    <LogOut size={13} /> Sair da conta
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1642,12 +1676,12 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const [rascunho, setRascunho] = useState(null);
 
   const nomesUnicos = useMemo(
-    () => [...new Set(compras.map((c) => c.nome))].sort((a, b) => a.localeCompare(b, "pt-BR")),
+    () => [...new Set(compras.map((c) => primeiroNomeDe(c.nome)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [compras]
   );
 
   const comprasFiltradas = useMemo(
-    () => (pessoaFiltro === "todos" ? compras : compras.filter((c) => c.nome === pessoaFiltro)),
+    () => (pessoaFiltro === "todos" ? compras : compras.filter((c) => primeiroNomeDe(c.nome).toLowerCase() === pessoaFiltro.toLowerCase())),
     [compras, pessoaFiltro]
   );
 
