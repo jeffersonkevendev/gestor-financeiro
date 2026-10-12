@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -1002,8 +1002,14 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
       </button>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}><p className="flex items-center gap-2 text-sm" style={{ color: COR.tintaSuave }}><CheckCircle2 size={18} color={COR.verde} />Pago</p><p className="fonte-mono font-bold mt-2">{fmt(totalPagoMes)}</p></div>
-        <div className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}><p className="flex items-center gap-2 text-sm" style={{ color: COR.tintaSuave }}><Circle size={18} color="#D97706" />Pendente</p><p className="fonte-mono font-bold mt-2">{fmt(totalGeralMes - totalPagoMes)}</p></div>
+        <div className="rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+          <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#2DB978" }}><Check size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
+          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pago</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{fmt(totalPagoMes)}</p></div>
+        </div>
+        <div className="rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+          <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#F5A623" }}><Clock size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
+          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pendente</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{fmt(totalGeralMes - totalPagoMes)}</p></div>
+        </div>
       </div>
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: COR.texto }}>Cartões</p>
