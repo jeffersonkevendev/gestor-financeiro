@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -355,28 +355,42 @@ function TelaLogin({ erroInicial }) {
 }
 
 function CarrosselMeses({ meses, mesSelecionado, onSelecionar, corAtiva }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
+  const botaoRef = useRef(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e) => { if (!ref.current?.contains(e.target)) setAberto(false); };
+    const teclado = (e) => { if (e.key === "Escape") { setAberto(false); botaoRef.current?.focus(); } };
+    document.addEventListener("pointerdown", fora);
+    document.addEventListener("keydown", teclado);
+    return () => { document.removeEventListener("pointerdown", fora); document.removeEventListener("keydown", teclado); };
+  }, [aberto]);
+  const opcoes = [...new Set([...meses, mesSelecionado])].sort();
+  const rotulo = (chave) => { const [ano, mes] = chave.split("-"); return `${MESES[Number(mes) - 1]} ${ano}`; };
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 carrossel-meses" style={{ scrollbarWidth: "none" }}>
-      {meses.map((chave) => {
-        const ativo = chave === mesSelecionado;
-        const [, m] = chave.split("-");
-        const rotuloCurto = MESES[parseInt(m, 10) - 1].slice(0, 3);
-        return (
-          <button
-            key={chave}
-            onClick={() => onSelecionar(chave)}
-            className="shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-            style={{
-              background: ativo ? corAtiva : COR.papelEscuro,
-              color: ativo ? "white" : COR.tintaSuave,
-            }}
-          >
-            {rotuloCurto}
-          </button>
-        );
-      })}
+    <div ref={ref} className="relative carrossel-meses">
+      <button ref={botaoRef} type="button" aria-expanded={aberto} aria-label={`Selecionar mês: ${rotulo(mesSelecionado)}`} onClick={() => setAberto((v) => !v)} className="w-full h-14 flex items-center gap-3 px-4 rounded-2xl border text-base font-semibold" style={{ background: COR.cartao, borderColor: COR.linha, color: COR.tinta, boxShadow: "0 2px 8px rgba(15,23,42,0.025)" }}>
+        <CalendarDays size={22} /><span className="flex-1 text-left">{rotulo(mesSelecionado)}</span><ChevronRight size={20} style={{ transform: aberto ? "rotate(-90deg)" : "rotate(90deg)" }} />
+      </button>
+      {aberto && <div aria-label="Meses disponíveis" className="absolute left-0 right-0 top-full mt-2 z-50 p-2 rounded-2xl border overflow-y-auto" style={{ background: COR.cartao, borderColor: COR.linha, maxHeight: "min(320px, 50vh)", boxShadow: "0 12px 32px rgba(15,23,42,0.15)" }}>
+        {opcoes.map((chave) => <button key={chave} type="button" aria-pressed={chave === mesSelecionado} onClick={() => { onSelecionar(chave); setAberto(false); botaoRef.current?.focus(); }} className="w-full text-left flex items-center justify-between gap-2 rounded-xl px-3 py-3 text-sm font-medium" style={{ color: chave === mesSelecionado ? corAtiva : COR.tinta, background: chave === mesSelecionado ? COR.papelEscuro : "transparent" }}>{rotulo(chave)}{chave === mesSelecionado && <Check size={16} />}</button>)}
+      </div>}
     </div>
   );
+}
+
+function statusDespesa(d, hoje = hojeISO()) {
+  if (d.paga) return { texto: "Paga", fundo: COR.verdeClaro, cor: COR.verde };
+  if (d.vencimento < hoje) return { texto: "Vencida", fundo: "#FEE2E2", cor: COR.vermelho };
+  if (d.vencimento === hoje) return { texto: "A vencer", fundo: "#FEF3C7", cor: "#92400E" };
+  return { texto: "Pendente", fundo: "#FFEDD5", cor: "#9A3412" };
+}
+
+function textoVencimento(data, hoje = hojeISO()) {
+  const d = new Date(`${data}T00:00:00`);
+  const curta = d.toLocaleDateString("pt-BR", { day: "numeric", month: "short", ...(data.slice(0, 4) !== hoje.slice(0, 4) ? { year: "numeric" } : {}) }).replace(/ de /g, " ").replace(/\./g, "");
+  return data === hoje ? `Vence hoje · ${curta}` : `Vence em ${curta}`;
 }
 
 // -------- campos reutilizáveis --------
@@ -393,7 +407,7 @@ const inputBase =
   "box-border h-10 px-2.5 rounded-2xl border bg-white outline-none text-sm focus:ring-2";
 
 // Botão de excluir com confirmação em duas etapas (evita apagar sem querer)
-function BotaoExcluirConfirmar({ onConfirmar }) {
+function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14 }) {
   const [confirmando, setConfirmando] = useState(false);
   if (confirmando) {
     return (
@@ -409,7 +423,7 @@ function BotaoExcluirConfirmar({ onConfirmar }) {
   }
   return (
     <button onClick={() => setConfirmando(true)} style={{ color: COR.vermelho }} title="Excluir">
-      <Trash2 size={14} />
+      <Trash2 size={tamanho} />
     </button>
   );
 }
@@ -1141,33 +1155,20 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
     <div className="flex flex-col gap-6">
       <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={COR.ouro} />
 
-      {/* fita de total - elemento assinatura */}
-      <div
-        className="relative rounded-2xl px-5 py-4"
-        style={{
-          background: COR.ouro, boxShadow: "0 8px 20px rgba(37,99,235,0.15)",
-        }}
-      >
-        <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>
-          Total de despesas — {rotuloDoMes(mesSelecionado)}
-        </p>
-        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalMes)}</p>
-        {(linhas.length > 0 || somaCartoes > 0) && (
-          <p className="text-xs mt-1" style={{ color: "#DBEAFE" }}>
-            Pago: <span className="fonte-mono">{fmt(totalPago)}</span> · Pendente: <span className="fonte-mono">{fmt(totalPendente)}</span>
-          </p>
-        )}
+      <div className="rounded-2xl px-5 py-5 border" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+        <p className="text-sm" style={{ color: COR.tintaSuave }}>Total do mês</p>
+        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.tinta }}>{fmt(totalMes)}</p>
       </div>
 
       <button
         onClick={() => setMostrarForm((v) => !v)}
-        className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-colors"
-        style={{ background: COR.ouro, color: "white" }}
+        className="flex items-center justify-center gap-2 rounded-2xl h-14 text-base font-semibold transition-colors"
+        style={{ background: COR.ouro, color: "white", boxShadow: "0 4px 12px rgba(37,99,235,0.18)" }}
       >
-        <Plus size={16} /> Adicionar despesa
+        <Plus size={22} /> Adicionar despesa
       </button>
 
-      <div className="flex gap-2" aria-label="Filtrar despesas">{["Todas", "Pendentes", "Pagas"].map((f) => <button key={f} aria-pressed={filtro === f} onClick={() => setFiltro(f)} className="px-4 py-2 rounded-full text-sm font-semibold" style={{ background: filtro === f ? COR.ouro : COR.papelEscuro, color: filtro === f ? "white" : COR.tintaSuave }}>{f}</button>)}</div>
+      <div className="flex gap-2" aria-label="Filtrar despesas">{["Todas", "Pendentes", "Pagas"].map((f) => <button key={f} aria-pressed={filtro === f} onClick={() => setFiltro(f)} className="flex-1 h-11 rounded-full text-sm font-semibold" style={{ background: filtro === f ? COR.ouro : COR.papelEscuro, color: filtro === f ? "white" : COR.tintaSuave }}>{f}</button>)}</div>
       {mostrarForm && (
         <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <Campo label="Descrição">
@@ -1225,9 +1226,9 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
 
       {filtro !== "Todas" && !linhasVisiveis.length && !cartoesVisiveis.length && <p role="status" className="text-sm text-center py-5" style={{ color: COR.tintaSuave }}>Nenhuma conta {filtro === "Pagas" ? "paga" : "pendente"} neste mês.</p>}
       {(linhasVisiveis.length > 0 || cartoesVisiveis.length > 0) && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+        <div className="flex flex-col gap-4">
           {linhasVisiveis.map((d, i) => (
-            <div key={d.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
+            <div key={d.id} className="rounded-2xl border overflow-hidden" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
               {editandoId === d.id ? (
                 <div className="p-3 flex flex-col gap-2" style={{ background: COR.papelEscuro }}>
                   <input
@@ -1256,69 +1257,37 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                   </div>
                 </div>
               ) : (
-                <div className="px-3 py-2.5">
+                <div className="p-4">
                   <div className="flex items-start gap-3">
-                    <button onClick={() => togglePaga(d.id)} className="mt-0.5 shrink-0" title={d.paga ? "Marcar como pendente" : "Marcar como paga"}>
-                      {d.paga ? <CheckCircle2 size={18} color={COR.verde} /> : <Circle size={18} color={COR.tintaSuave} />}
+                    <button onClick={() => togglePaga(d.id)} className="mt-1 shrink-0 p-1" title={d.paga ? "Marcar como pendente" : "Marcar como paga"} aria-label={`${d.paga ? "Marcar como pendente" : "Marcar como paga"}: ${d.descricao}`}>
+                      {d.paga ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
                     </button>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className="text-sm font-medium break-words"
-                        style={{ textDecoration: d.paga ? "line-through" : "none", color: d.paga ? COR.tintaSuave : COR.tinta }}
-                      >
-                        {d.descricao}
-                      </p>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: corCategoria(d.categoria) + "22", color: corCategoria(d.categoria) }}>
-                          {d.categoria}
-                        </span>
-                        <span className="text-xs" style={{ color: COR.tintaSuave }}>
-                          Vence em {new Date(d.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
-                        </span>
-                        {!d.paga && d.vencimento < hojeISO() && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "#F8D9DF", color: COR.vermelho }}>
-                            Atrasada
-                          </span>
-                        )}
-                      </div>
+                    <div className="min-w-0 flex-1 pt-1">
+                      <p className="text-base font-bold break-words" style={{ color: d.paga ? COR.tintaSuave : COR.tinta }}>{d.descricao}</p>
+                      <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 pt-1 shrink-0">
+                      <span className="fonte-mono text-base font-bold" style={{ color: COR.tinta }}>{fmt(d.valor)}</span>
+                      <span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: statusDespesa(d).fundo, color: statusDespesa(d).cor }}>{statusDespesa(d).texto}</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mt-2 pl-7">
-                    <span className="fonte-mono text-sm font-semibold">{fmt(d.valor)}</span>
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => iniciarEdicao(d)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
-                      <BotaoExcluirConfirmar onConfirmar={() => excluir(d.id)} />
-                    </div>
+                  <div className="flex justify-end items-center gap-4 mt-5">
+                    <button onClick={() => iniciarEdicao(d)} className="p-1" aria-label={`Editar ${d.descricao}`} style={{ color: COR.tintaSuave }}><Pencil size={19} /></button>
+                    <BotaoExcluirConfirmar tamanho={19} onConfirmar={() => excluir(d.id)} />
                   </div>
                 </div>
               )}
             </div>
           ))}
 
-          {cartoesVisiveis.map((f, idx) => (
-            <div key={f.id} style={{ borderTop: (linhas.length || idx > 0) ? `1px solid ${COR.linha}` : "none" }}>
-              <div className="px-3 py-2.5">
-                <div className="flex items-start gap-3">
-                  <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-0.5 shrink-0" title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
-                    {f.pago ? <CheckCircle2 size={18} color={COR.verde} /> : <Circle size={18} color={COR.tintaSuave} />}
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="text-sm font-medium break-words"
-                      style={{ textDecoration: f.pago ? "line-through" : "none", color: f.pago ? COR.tintaSuave : COR.tinta }}
-                    >
-                      {f.label} — soma automática
-                    </p>
-                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1" style={{ background: f.corClara, color: f.cor }}>
-                        <ArrowRight size={10} /> Cartão
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 pl-7">
-                  <span className="fonte-mono text-sm font-semibold" style={{ color: f.cor }}>{fmt(f.total)}</span>
-                </div>
+          {cartoesVisiveis.map((f) => (
+            <div key={f.id} className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+              <div className="flex items-start gap-3">
+                <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-1 shrink-0 p-1" aria-label={`${f.pago ? "Marcar como pendente" : "Marcar como paga"}: ${f.label}`} title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
+                  {f.pago ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
+                </button>
+                <div className="min-w-0 flex-1 pt-1"><p className="text-base font-bold break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>Fatura do cartão</p></div>
+                <div className="flex flex-col items-end gap-2 pt-1 shrink-0"><span className="fonte-mono text-base font-bold">{fmt(f.total)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: f.pago ? COR.verdeClaro : "#FFEDD5", color: f.pago ? COR.verde : "#9A3412" }}>{f.pago ? "Paga" : "Pendente"}</span></div>
               </div>
             </div>
           ))}
@@ -1695,10 +1664,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={corPrincipal} />
 
       <div className="rounded-2xl px-5 py-4 oculta-impressao" style={{ background: corPrincipal }}>
-        <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: corClara }}>
-          {pessoaFiltro === "todos" ? `Total no ${nomeCartao}` : `Total de ${pessoaFiltro}`} — {rotuloDoMes(mesSelecionado)}
-        </p>
-        <p className="fonte-mono text-3xl font-bold mt-1 text-white">{fmt(totalMes)}</p>
+        <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
       </div>
 
       <button
