@@ -407,12 +407,13 @@ const inputBase =
   "box-border h-10 px-2.5 rounded-2xl border bg-white outline-none text-sm focus:ring-2";
 
 // Botão de excluir com confirmação em duas etapas (evita apagar sem querer)
-function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14 }) {
+function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14, descricao = "Excluir", aviso = "" }) {
   const [confirmando, setConfirmando] = useState(false);
   if (confirmando) {
     return (
       <span className="flex items-center gap-1.5">
-        <button onClick={() => { onConfirmar(); setConfirmando(false); }} style={{ color: COR.vermelho }} title="Confirmar exclusão">
+        {aviso && <span className="text-xs" style={{ color: COR.vermelho }}>{aviso}</span>}
+        <button onClick={() => { onConfirmar(); setConfirmando(false); }} style={{ color: COR.vermelho }} title={`Confirmar: ${descricao}`} aria-label={`Confirmar: ${descricao}`}>
           <Check size={15} />
         </button>
         <button onClick={() => setConfirmando(false)} style={{ color: COR.tintaSuave }} title="Cancelar">
@@ -422,7 +423,7 @@ function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14 }) {
     );
   }
   return (
-    <button onClick={() => setConfirmando(true)} style={{ color: COR.vermelho }} title="Excluir">
+    <button onClick={() => setConfirmando(true)} style={{ color: COR.vermelho }} title={descricao} aria-label={descricao}>
       <Trash2 size={tamanho} />
     </button>
   );
@@ -996,11 +997,8 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
           background: COR.ouro, boxShadow: "0 8px 20px rgba(37,99,235,0.15)",
         }}
       >
-        <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>Despesas deste mês</p>
+        <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>Despesas do Mês</p>
         <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalGeralMes)}</p>
-        <p className="text-xs mt-1" style={{ color: "#DBEAFE" }}>
-          Despesas: <span className="fonte-mono">{fmt(totalDespesasReais)}</span> · Cartões: <span className="fonte-mono">{fmt(somaCartoesMes)}</span>
-        </p>
       </button>
 
       <div className="grid grid-cols-2 gap-3">
@@ -1033,6 +1031,8 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
         </div>
       </div>
 
+      <div>
+      <p className="text-sm font-semibold mb-2" style={{ color: COR.texto }}>Atalhos</p>
       <div className="grid grid-cols-2 gap-3">
       <button onClick={() => onIrPara("despesas")} className="flex items-center justify-center gap-2 rounded-2xl p-4 text-sm font-semibold" style={{ background: COR.cartao, border: `1px solid ${COR.linha}`, color: COR.ouro }}><Plus size={18} />Despesas</button>
       <button
@@ -1042,6 +1042,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
       >
         <IconeCalculadora size={16} /> Calculadora
       </button>
+      </div>
       </div>
     </div>
   );
@@ -1391,6 +1392,31 @@ function editarCompraComParcelas(compras, id, rascunho) {
 }
 
 
+function excluirCompraComParcelas(compras, id) {
+  const original = compras.find((c) => c.id === id);
+  if (!original) return compras;
+  const info = dadosParcelamento(original);
+  if (!info.parcelada) return compras.filter((c) => c.id !== id);
+  if (original.compartilhamentoId) {
+    const grupos = new Set(compras.filter((c) => c.compartilhamentoId === original.compartilhamentoId).map((c) => c.parcelaGrupoId).filter(Boolean));
+    return compras.filter((c) => c.compartilhamentoId !== original.compartilhamentoId && !grupos.has(c.parcelaGrupoId));
+  }
+  if (original.parcelaGrupoId) return compras.filter((c) => c.parcelaGrupoId !== original.parcelaGrupoId);
+  // Compras antigas: identifica a sequência pelo nome, descrição, número e mês.
+  const ids = new Set([id]);
+  for (let numero = 1; numero <= info.total; numero++) {
+    const data = deslocarMesCompra(chaveDoMes(original.data), numero - info.numero);
+    const candidatos = compras.filter((c) => {
+      const parcela = dadosParcelamento(c);
+      return !c.parcelaGrupoId && c.nome === original.nome && parcela.parcelada && parcela.descricao === info.descricao
+        && parcela.total === info.total && parcela.numero === numero && chaveDoMes(c.data) === chaveDoMes(data);
+    });
+    if (candidatos.length > 1) throw new Error("Há compras parceladas iguais no mesmo mês. Não foi possível identificar todas as parcelas com segurança; nenhuma foi excluída.");
+    candidatos.forEach((c) => ids.add(c.id));
+  }
+  return compras.filter((c) => !ids.has(c.id));
+}
+
 function limparCompartilhamento(c) {
   const { compartilhamentoId, parteCompartilhada, nomePrincipal, nomeDivisao, valorCompartilhado, ...resto } = c;
   return resto;
@@ -1505,6 +1531,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
   const [erroEdicao, setErroEdicao] = useState("");
+  const [erroExclusao, setErroExclusao] = useState("");
 
   const nomesUnicos = useMemo(() => {
     const nomes = new Map();
@@ -1611,7 +1638,11 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   };
 
   const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); setErroEdicao(""); };
-  const excluir = (id) => onAtualizarCompras(compras.filter((c) => c.id !== id));
+  const excluir = (id) => {
+    setErroExclusao("");
+    try { onAtualizarCompras(excluirCompraComParcelas(compras, id)); }
+    catch (erro) { setErroExclusao(erro.message); }
+  };
 
   const gerarRelatorioPdf = () => {
     onGerarPdf({ nomeCartao, pessoaFiltro, mostrarPessoa: todasPessoas || selecaoValida.length !== 1, mesSelecionado, linhas: linhasMes, total: totalMes });
@@ -1769,6 +1800,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
         </div>
       )}
 
+      {erroExclusao && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroExclusao}</p>}
       {linhasMes.length === 0 && !mostrarForm && (
         <p className="text-sm text-center py-8 oculta-impressao" style={{ color: COR.tintaSuave }}>
           Nenhuma compra {todasPessoas ? "" : (selecaoValida.length ? `de ${pessoaFiltro} ` : "— selecione uma ou mais pessoas — ")}em {rotuloDoMes(mesSelecionado)}.
@@ -1849,7 +1881,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     <span className="fonte-mono text-sm font-semibold">{fmt(c.valor)}</span>
                     <div className="flex items-center gap-3">
                       <button onClick={() => iniciarEdicao(c)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
-                      <BotaoExcluirConfirmar onConfirmar={() => excluir(c.id)} />
+                      <BotaoExcluirConfirmar descricao={dadosParcelamento(c).parcelada ? "Excluir todas as parcelas desta compra" : "Excluir compra"} aviso={dadosParcelamento(c).parcelada ? (c.compartilhamentoId ? "Todas as parcelas das duas pessoas" : "Todas as parcelas") : ""} onConfirmar={() => excluir(c.id)} />
                     </div>
                   </div>
                 </div>
