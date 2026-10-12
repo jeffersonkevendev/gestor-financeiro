@@ -14,6 +14,7 @@ import {
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import html2canvas from "html2canvas";
 import { auth, googleProvider, db } from "./firebase";
+import { criarSincronizacaoNuvem } from "./sincronizacaoNuvem";
 
 const mensagemErroAuth = (codigo) => {
   const mapa = {
@@ -176,52 +177,76 @@ const DADOS_PADRAO_NUVEM = {
 
 // Guarda despesas, receitas, cartões, orçamento e pagamentos no Firestore, num documento por usuário logado.
 function useDadosNuvem(uid) {
-  const [dados, setDadosLocal] = useState(DADOS_PADRAO_NUVEM);
-  const [carregando, setCarregando] = useState(true);
+  const [estado, setEstado] = useState({
+    dados: DADOS_PADRAO_NUVEM, carregando: true, salvando: false,
+    temPendencias: false, erroLeitura: "", erroSalvar: "",
+  });
+  const sincronizacao = useRef(null);
 
   useEffect(() => {
     if (!uid) return;
-    setCarregando(true);
     const ref = doc(db, "usuarios", uid);
-    const cancelar = onSnapshot(
-      ref,
-      async (snap) => {
-        if (snap.exists()) {
-          setDadosLocal({ ...DADOS_PADRAO_NUVEM, ...snap.data() });
-        } else {
-          await setDoc(ref, DADOS_PADRAO_NUVEM, { merge: true });
-          setDadosLocal(DADOS_PADRAO_NUVEM);
-        }
-        setCarregando(false);
-      },
-      () => setCarregando(false)
-    );
-    return cancelar;
+    const controle = criarSincronizacaoNuvem({
+      padrao: DADOS_PADRAO_NUVEM,
+      escutar: (sucesso, erro) => onSnapshot(ref, { includeMetadataChanges: true }, sucesso, erro),
+      // Substitui só os campos alterados, inclusive mapas, preservando perfil e outros campos.
+      gravar: (patch) => setDoc(ref, patch, { mergeFields: Object.keys(patch) }),
+      notificar: setEstado,
+    });
+    sincronizacao.current = controle;
+    controle.iniciar();
+    return () => {
+      controle.parar();
+      sincronizacao.current = null;
+    };
   }, [uid]);
 
-  const criarSetter = (campo) => (valorOuFuncao) => {
-    setDadosLocal((prevDados) => {
-      const valorAtual = prevDados[campo];
-      const novoValor = typeof valorOuFuncao === "function" ? valorOuFuncao(valorAtual) : valorOuFuncao;
-      const novoDados = { ...prevDados, [campo]: novoValor };
-      if (uid) setDoc(doc(db, "usuarios", uid), novoDados).catch(() => {});
-      return novoDados;
-    });
-  };
+  useEffect(() => {
+    if (!estado.temPendencias) return;
+    const avisar = (evento) => {
+      evento.preventDefault();
+      evento.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [estado.temPendencias]);
 
+  const criarSetter = (campo) => (valor) => sincronizacao.current?.alterar(campo, valor);
   return {
-    despesas: dados.despesas,
+    ...estado.dados,
     setDespesas: criarSetter("despesas"),
-    receitas: dados.receitas,
     setReceitas: criarSetter("receitas"),
-    cartoes: dados.cartoes,
     setCartoes: criarSetter("cartoes"),
-    pagamentosCartaoPagos: dados.pagamentosCartaoPagos,
     setPagamentosCartaoPagos: criarSetter("pagamentosCartaoPagos"),
-    orcamentoMensal: dados.orcamentoMensal,
     setOrcamentoMensal: criarSetter("orcamentoMensal"),
-    carregando,
+    carregando: estado.carregando,
+    salvando: estado.salvando,
+    temPendencias: estado.temPendencias,
+    erroNuvem: estado.erroLeitura || estado.erroSalvar,
+    tentarNovamente: () => sincronizacao.current?.tentarNovamente(),
   };
+}
+
+function TelaErroNuvem({ mensagem, temPendencias, salvando, tentarNovamente }) {
+  const [erroSaida, setErroSaida] = useState("");
+  const sair = async () => {
+    try { await signOut(auth); }
+    catch (erro) { setErroSaida(mensagemErroAuth(erro.code)); }
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: COR.papel, color: COR.tinta }}>
+      <div className="max-w-sm w-full rounded-2xl bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold mb-3">{temPendencias ? "Alterações ainda não salvas" : "Não foi possível carregar seus dados"}</h1>
+        <p role="alert" className="text-sm mb-4" style={{ color: COR.vermelho }}>{mensagem}</p>
+        {temPendencias && <p className="text-sm mb-4">Suas alterações estão nesta sessão. Mantenha esta página aberta e tente novamente para salvar.</p>}
+        <button onClick={tentarNovamente} disabled={salvando} className="w-full rounded-xl p-3 text-white font-bold disabled:opacity-60" style={{ background: COR.ouro }}>
+          {salvando ? "Salvando..." : "Tentar novamente"}
+        </button>
+        {!temPendencias && <button onClick={sair} className="w-full mt-3 p-2 text-sm">Sair e entrar novamente</button>}
+        {erroSaida && <p role="alert" className="mt-3 text-sm" style={{ color: COR.vermelho }}>{erroSaida}</p>}
+      </div>
+    </div>
+  );
 }
 
 // -------- tela de carregamento --------
@@ -736,12 +761,13 @@ export default function App() {
 
   if (usuario === undefined) return <TelaCarregando />;
   if (usuario === null) return <TelaLogin erroInicial={erroRedirecionamento} />;
-  return <MeuCaixaApp usuario={usuario} />;
+  return <MeuCaixaApp key={usuario.uid} usuario={usuario} />;
 }
 
 function MeuCaixaApp({ usuario }) {
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "inicio");
-  const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, orcamentoMensal, setOrcamentoMensal, carregando } = useDadosNuvem(usuario.uid);
+  const [erroSaida, setErroSaida] = useState("");
+  const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, orcamentoMensal, setOrcamentoMensal, carregando, salvando, temPendencias, erroNuvem, tentarNovamente } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
   const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState(null);
@@ -884,6 +910,7 @@ function MeuCaixaApp({ usuario }) {
   };
   const excluirReceita = (id) => setReceitas((prev) => prev.filter((r) => r.id !== id));
 
+  if (erroNuvem) return <TelaErroNuvem mensagem={erroNuvem} temPendencias={temPendencias} salvando={salvando} tentarNovamente={tentarNovamente} />;
   if (carregando) return <TelaCarregando />;
 
   return (
@@ -898,6 +925,10 @@ function MeuCaixaApp({ usuario }) {
         input:focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
         .relatorio-impressao { position: fixed; top: 0; left: -10000px; width: 420px; background: white; }
       `}</style>
+
+      {temPendencias && <div role="status" aria-live="polite" className="sticky top-0 z-50 px-5 py-3 text-center text-sm" style={{ background: COR.ouroClaro, color: COR.tinta }}>
+        Salvando no Firebase... Mantenha esta página aberta até concluir.
+      </div>}
 
       {/* cabeçalho */}
       <header style={{ background: COR.tinta }} className="px-5 pt-7 pb-0 oculta-impressao">
@@ -933,12 +964,18 @@ function MeuCaixaApp({ usuario }) {
                   </button>
 
                   <button
-                    onClick={() => { setMostrarMenuUsuario(false); signOut(auth); }}
-                    className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1.5"
+                    disabled={temPendencias}
+                    onClick={async () => {
+                      setErroSaida("");
+                      try { await signOut(auth); }
+                      catch (erro) { setErroSaida(mensagemErroAuth(erro.code)); }
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-semibold w-full text-left py-1.5 disabled:opacity-60"
                     style={{ color: COR.vermelho }}
                   >
-                    <LogOut size={13} /> Sair da conta
+                    <LogOut size={13} /> {temPendencias ? "Aguarde o salvamento" : "Sair da conta"}
                   </button>
+                  {erroSaida && <p role="alert" className="text-xs mt-2" style={{ color: COR.vermelho }}>{erroSaida}</p>}
                 </div>
               )}
             </div>
