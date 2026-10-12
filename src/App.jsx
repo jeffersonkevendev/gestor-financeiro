@@ -740,10 +740,11 @@ function MeuCaixaApp({ usuario }) {
         <div className="max-w-2xl mx-auto flex justify-around py-2">
           {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
+            { label: "Perfil", Icon: User, ativo: mostrarMenuUsuario, acao: () => setMostrarMenuUsuario((v) => !v) },
             { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => setMostrarListaCartoes(true) },
-            { label: "Perfil", Icon: User, ativo: mostrarMenuUsuario, acao: () => setMostrarMenuUsuario((v) => !v) }
+            { label: "Calculadora", Icon: IconeCalculadora, ativo: mostrarCalculadora, acao: () => setMostrarCalculadora(true) }
           ].map(({ label, Icon, ativo, acao }) => (
-            <button key={label} aria-current={ativo ? "page" : undefined} onClick={() => { if (label !== "Perfil") setMostrarMenuUsuario(false); acao(); }} className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
+            <button key={label} aria-current={ativo ? "page" : undefined} onClick={() => { if (label !== "Perfil") setMostrarMenuUsuario(false); acao(); }} className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] sm:text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
               <Icon size={21} /><span>{label}</span>
             </button>
           ))}
