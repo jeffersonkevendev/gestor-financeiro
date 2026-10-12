@@ -462,7 +462,7 @@ function MeuCaixaApp({ usuario }) {
   const inicioRef = useRef({ x: 0, y: 0 });
 
   const aoTocarInicio = (e) => {
-    ignorarGestoRef.current = !!e.target.closest(".carrossel-meses, input, select, textarea");
+    ignorarGestoRef.current = !!e.target.closest(".carrossel-meses, .filtro-pessoas, input, select, textarea");
     if (ignorarGestoRef.current) return;
     arrastandoRef.current = true;
     inicioRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -1504,6 +1504,24 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
   // null seleciona todas as pessoas, inclusive novos nomes adicionados depois.
   const [pessoasSelecionadas, setPessoasSelecionadas] = useState(null);
+  const [menuPessoasAberto, setMenuPessoasAberto] = useState(false);
+  const filtroPessoasRef = useRef(null);
+  const botaoFiltroRef = useRef(null);
+  useEffect(() => {
+    if (!menuPessoasAberto) return;
+    const fecharFora = (e) => {
+      if (!filtroPessoasRef.current?.contains(e.target)) setMenuPessoasAberto(false);
+    };
+    const fecharEsc = (e) => {
+      if (e.key === "Escape") { setMenuPessoasAberto(false); botaoFiltroRef.current?.focus(); }
+    };
+    document.addEventListener("pointerdown", fecharFora);
+    document.addEventListener("keydown", fecharEsc);
+    return () => {
+      document.removeEventListener("pointerdown", fecharFora);
+      document.removeEventListener("keydown", fecharEsc);
+    };
+  }, [menuPessoasAberto]);
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
@@ -1531,7 +1549,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const selecaoValida = pessoasSelecionadas === null ? null : pessoasSelecionadas.filter((nome) => nomesUnicos.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR")));
   const todasPessoas = selecaoValida === null;
   const pessoaFiltro = todasPessoas ? "todos" : (selecaoValida.length ? selecaoValida.join(", ") : "Nenhuma pessoa selecionada");
-  const resumoFiltro = todasPessoas ? "Todas as pessoas" : (selecaoValida.length === 1 ? selecaoValida[0] : `${selecaoValida.length} pessoas selecionadas`);
+  const resumoFiltro = todasPessoas ? "Todas as pessoas" : (selecaoValida.length === 1 ? selecaoValida[0] : (selecaoValida.length ? `${selecaoValida.length} pessoas` : "Selecionar pessoas"));
   const alternarPessoa = (nome) => setPessoasSelecionadas((atuais) => {
     const lista = atuais === null ? nomesUnicos : atuais;
     const inclui = lista.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"));
@@ -1634,29 +1652,38 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
     <div className="flex flex-col gap-6">
       <div className="flex gap-2 oculta-impressao">
         <div className="flex-1 min-w-0">
-          <Campo label="Filtrar por pessoa">
-            <details className="rounded-2xl border bg-white" style={{ borderColor: COR.linha }}>
-              <summary className="flex items-center justify-between gap-2 px-3 py-3 cursor-pointer text-sm" style={{ listStyle: "none" }}><span className="break-words">{resumoFiltro}</span><ChevronRight size={16} className="shrink-0" /></summary>
-              <div className="px-3 pb-3 flex flex-col gap-2" style={{ borderTop: `1px solid ${COR.linha}` }}>
-                <div className="flex flex-wrap gap-2 py-2">
+          <div className="flex flex-col gap-1 text-xs w-full">
+            <span className="uppercase tracking-wide font-semibold leading-tight min-h-[32px] flex items-end" style={{ color: COR.tintaSuave }}>Filtrar por pessoa</span>
+            <div ref={filtroPessoasRef} className="relative filtro-pessoas">
+              <button ref={botaoFiltroRef} type="button" aria-expanded={menuPessoasAberto} aria-controls={`menu-pessoas-${cartao.id}`} onClick={() => setMenuPessoasAberto((v) => !v)} className="w-full h-11 rounded-2xl border flex items-center justify-between gap-2 px-3 text-sm text-left" style={{ background: COR.cartao, borderColor: menuPessoasAberto ? corPrincipal : COR.linha }}>
+                <span className="truncate">{resumoFiltro}</span>
+                <ChevronRight size={16} className="shrink-0" style={{ transform: menuPessoasAberto ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 0.15s" }} />
+              </button>
+              {menuPessoasAberto && <div id={`menu-pessoas-${cartao.id}`} aria-label="Selecionar pessoas" className="absolute left-0 top-full mt-2 z-50 rounded-2xl border p-3 flex flex-col gap-2" style={{ width: "min(320px, calc(100vw - 48px))", maxHeight: "min(380px, 55vh)", background: COR.cartao, borderColor: COR.linha, boxShadow: "0 12px 32px rgba(15,23,42,0.18)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold" style={{ color: COR.tinta }}>Selecionar pessoas</span>
+                  <button type="button" aria-label="Fechar filtro" onClick={() => { setMenuPessoasAberto(false); botaoFiltroRef.current?.focus(); }} className="p-2 rounded-lg"><X size={16} /></button>
+                </div>
+                <div className="flex gap-2">
                   <button type="button" onClick={() => setPessoasSelecionadas(null)} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: corClara, color: corPrincipal }}>Todas</button>
                   <button type="button" onClick={() => setPessoasSelecionadas([])} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: COR.papelEscuro, color: COR.tintaSuave }}>Limpar seleção</button>
                 </div>
-                <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
-                  {nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))} onChange={() => alternarPessoa(nome)} style={{ accentColor: corPrincipal }} className="w-4 h-4" />{nome}
+                <div className="flex flex-col min-h-0 overflow-y-auto">
+                  {nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm cursor-pointer shrink-0" style={{ background: (todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))) ? corClara : "transparent" }}>
+                    <input type="checkbox" checked={todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))} onChange={() => alternarPessoa(nome)} style={{ accentColor: corPrincipal, minHeight: 16, width: 16, height: 16 }} />{nome}
                   </label>)}
                 </div>
                 {!nomesUnicos.length && <p className="text-xs" style={{ color: COR.tintaSuave }}>Nenhuma pessoa cadastrada neste cartão.</p>}
-              </div>
-            </details>
-          </Campo>
+                <button type="button" onClick={() => { setMenuPessoasAberto(false); botaoFiltroRef.current?.focus(); }} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: corPrincipal }}>Concluir</button>
+              </div>}
+            </div>
+          </div>
         </div>
         <div className="flex items-end">
           <button
             onClick={gerarRelatorioPdf}
             disabled={linhasMes.length === 0 || gerandoImagem}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-sm font-semibold text-white disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 h-11 rounded-2xl text-sm font-semibold text-white disabled:opacity-40"
             style={{ background: COR.tinta }}
             title={pessoaFiltro === "todos" ? "Gera uma imagem do relatório do mês selecionado" : `Gera uma imagem do relatório de ${pessoaFiltro} no mês selecionado`}
           >
