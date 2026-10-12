@@ -59,6 +59,23 @@ const COR = {
   texto: "#14213D",
 };
 
+// Símbolo vetorial do cabeçalho oficial: https://nubank.com.br/
+function IconeBanco({ cartao }) {
+  const nubank = cartao.id === "nubank" || /nu\s*bank/i.test(cartao.nome || "");
+  return (
+    <span className="shrink-0 flex items-center justify-center rounded-2xl" style={{ width: 48, height: 48, background: nubank ? "#820AD1" : (cartao.cor || COR.ouro), color: "white" }}>
+      {nubank ? (
+        <svg aria-hidden="true" focusable="false" width="30" height="18" viewBox="0 0 44 24" fill="none">
+          <path d="M0.0243654 9.87682C-0.0304567 10.9469 0.0243654 12.042 0.0243654 13.1171V23.4431H5.83551V13.9822C5.83551 11.0319 5.81557 8.41669 5.83551 7.88164C5.94515 5.33141 6.64289 3.65626 7.95364 2.29613C7.85894 2.29613 7.7493 2.28613 7.65461 2.28613C4.82379 2.28613 2.16741 3.90628 0.8766 6.40651C0.293492 7.51161 0.0891551 8.69171 0.0243654 9.88182V9.87682Z" fill="currentColor" />
+          <path d="M13.3499 0C11.177 0 9.323 0.845077 7.9375 2.29521C12.2635 2.29521 15.0743 5.23547 15.2239 9.9109C15.2538 10.981 15.2687 16.7315 15.2687 16.7315V23.4471H21.0799V14.3763C21.0799 11.6311 21.0998 9.26084 20.9054 7.62069C20.3771 3.06028 17.5712 0.00500045 13.3499 0.00500045V0Z" fill="currentColor" />
+          <path d="M43.9757 14.1248C44.0305 13.0547 43.9757 11.9596 43.9757 10.8845V0.558594H38.1645V10.0195C38.1645 12.9697 38.1844 15.585 38.1645 16.12C38.0549 18.6702 37.3571 20.3454 36.0464 21.7055C36.1411 21.7055 36.2507 21.7155 36.3454 21.7155C39.1762 21.7155 41.8326 20.0954 43.1234 17.5951C43.7065 16.49 43.9109 15.3199 43.9757 14.1198V14.1248Z" fill="currentColor" />
+          <path d="M30.6536 24.0007C32.8265 24.0007 34.6805 23.1556 36.066 21.7055C31.74 21.7055 28.9291 18.7652 28.7796 14.0898C28.7497 13.0197 28.7248 10.3595 28.7248 7.2692V0.558594L22.9137 0.568595V9.63942C22.9137 12.3847 22.8937 14.7549 23.0881 16.395C23.6264 20.9554 26.4372 24.0007 30.6536 24.0007Z" fill="currentColor" />
+        </svg>
+      ) : <CreditCard size={24} aria-hidden="true" />}
+    </span>
+  );
+}
+
 const CATEGORIAS = ["Moradia", "Alimentação", "Transporte", "Saúde", "Lazer", "Educação", "Assinaturas", "Outros"];
 const CORES_CATEGORIA = ["#2563EB", "#2E7D5B", "#2A6F97", "#A83232", "#7A4FB5", "#B5651D", "#64748B", "#8A8F63"];
 const corCategoria = (nome) => {
@@ -721,7 +738,7 @@ function MeuCaixaApp({ usuario }) {
         <div role="dialog" aria-modal="true" aria-label="Seus cartões" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(15,23,42,0.35)" }} onClick={() => setMostrarListaCartoes(false)}>
           <div className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "80vh" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Seus cartões</h2><button aria-label="Fechar cartões" onClick={() => setMostrarListaCartoes(false)} className="p-2"><X size={20} /></button></div>
-            {cartoes.map((c) => <button key={c.id} onClick={() => { setAba(`cartao-${c.id}`); setMostrarListaCartoes(false); }} className="flex items-center gap-3 p-4 rounded-xl border text-left" style={{ borderColor: COR.linha }}><CreditCard size={22} color={c.cor} /><span className="flex-1">{c.nome}</span><ChevronRight size={18} /></button>)}
+            {cartoes.map((c) => <button key={c.id} onClick={() => { setAba(`cartao-${c.id}`); setMostrarListaCartoes(false); }} className="flex items-center gap-3 p-4 rounded-xl border text-left" style={{ borderColor: COR.linha }}><IconeBanco cartao={c} /><span className="flex-1">{c.nome}</span><ChevronRight size={18} /></button>)}
             {!cartoes.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado.</p>}
             <button onClick={() => { setMostrarListaCartoes(false); setMostrarAddCartao(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
           </div>
@@ -986,11 +1003,14 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
               className="flex items-center justify-between rounded-2xl px-4 py-3"
               style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.cor }} />
-                <span className="text-sm font-medium truncate" style={{ color: COR.texto }}>{c.nome}</span>
+              <div className="flex items-center gap-3 min-w-0 text-left">
+                <IconeBanco cartao={c} />
+                <div className="min-w-0">
+                  <span className="block text-sm font-semibold truncate" style={{ color: COR.texto }}>{c.nome}</span>
+                  <span className="block fonte-mono text-base font-bold mt-1" style={{ color: COR.texto }}>{fmt(c.totalMes)}</span>
+                </div>
               </div>
-              <span className="fonte-mono text-sm font-semibold shrink-0" style={{ color: c.cor }}>{fmt(c.totalMes)}</span>
+              <ChevronRight size={20} color={COR.tintaSuave} className="shrink-0 ml-2" aria-hidden="true" />
             </button>
           ))}
           {cartoesComTotal.length === 0 && (
