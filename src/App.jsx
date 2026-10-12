@@ -789,7 +789,7 @@ function MeuCaixaApp({ usuario }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#555" }}>
-                {relatorio.pessoaFiltro === "todos" && <th style={{ padding: "3px 0" }}>Pessoa</th>}
+                {(relatorio.mostrarPessoa ?? relatorio.pessoaFiltro === "todos") && <th style={{ padding: "3px 0" }}>Pessoa</th>}
                 <th style={{ padding: "3px 0" }}>Compra</th>
                 <th style={{ padding: "3px 0", textAlign: "right" }}>Valor</th>
               </tr>
@@ -797,7 +797,7 @@ function MeuCaixaApp({ usuario }) {
             <tbody>
               {relatorio.linhas.map((c) => (
                 <tr key={c.id} style={{ borderTop: "1px solid #eee" }}>
-                  {relatorio.pessoaFiltro === "todos" && <td style={{ padding: "3px 0" }}>{c.nome}</td>}
+                  {(relatorio.mostrarPessoa ?? relatorio.pessoaFiltro === "todos") && <td style={{ padding: "3px 0" }}>{c.nome}</td>}
                   <td style={{ padding: "3px 0" }}>{c.compra}</td>
                   <td style={{ padding: "3px 0", textAlign: "right" }} className="fonte-mono">{fmt(c.valor)}</td>
                 </tr>
@@ -1345,31 +1345,203 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
   );
 }
 
+
+function dadosParcelamento(compra) {
+  const partes = (compra.compra || "").match(/^(.*?)\s*\(parcela\s+(\d+)\/(\d+)\)\s*$/i);
+  return {
+    parcelada: !!(compra.parcelaGrupoId || partes),
+    descricao: compra.compraBase || (partes ? partes[1].trim() : compra.compra),
+    numero: compra.parcelaNumero || (partes ? Number(partes[2]) : 1),
+    total: compra.totalParcelas || (partes ? Number(partes[3]) : 1),
+  };
+}
+
+const deslocarMesCompra = (mes, deslocamento) => {
+  const [ano, numero] = mes.split("-").map(Number);
+  const data = new Date(ano, numero - 1 + deslocamento, 1);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-01`;
+};
+
+function editarCompraComParcelas(compras, id, rascunho) {
+  const original = compras.find((c) => c.id === id);
+  if (!original) throw new Error("Esta compra não foi encontrada. Abra a edição novamente.");
+  const magnitude = valorMascaradoParaNumero(rascunho.valor);
+  if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(magnitude > 0) || !/^\d{4}-\d{2}$/.test(rascunho.mes))
+    throw new Error("Preencha o nome, a compra, o mês e um valor maior que zero.");
+  const inicio = Number(rascunho.parcelaAtual), total = Number(rascunho.totalParcelas);
+  if (rascunho.parcelada && (!Number.isInteger(inicio) || !Number.isInteger(total) || inicio < 1 || total < inicio || total > 120))
+    throw new Error("Informe a parcela atual e o total: de 1 a 120, com o total igual ou maior que a parcela atual.");
+  const info = dadosParcelamento(original);
+  const substituir = new Set([id]);
+  if (info.parcelada) {
+    if (original.parcelaGrupoId) {
+      compras.filter((c) => c.parcelaGrupoId === original.parcelaGrupoId && chaveDoMes(c.data) >= chaveDoMes(original.data))
+        .forEach((c) => substituir.add(c.id));
+    } else {
+      // Compatibilidade com compras antigas, que guardavam as parcelas apenas no texto.
+      for (let numero = info.numero; numero <= info.total; numero++) {
+        const data = deslocarMesCompra(chaveDoMes(original.data), numero - info.numero);
+        const candidatos = compras.filter((c) => {
+          const d = dadosParcelamento(c);
+          return !c.parcelaGrupoId && c.nome === original.nome && d.parcelada && d.descricao === info.descricao
+            && d.numero === numero && d.total === info.total && chaveDoMes(c.data) === chaveDoMes(data);
+        });
+        if (candidatos.length > 1) throw new Error("Há compras parceladas iguais no mesmo mês. Não foi possível identificar com segurança as próximas parcelas.");
+        candidatos.forEach((c) => substituir.add(c.id));
+      }
+    }
+  }
+  const valor = rascunho.negativo ? -magnitude : magnitude;
+  const nome = rascunho.nome.trim(), descricao = rascunho.compra.trim();
+  let novos;
+  if (rascunho.parcelada) {
+    const grupoId = original.parcelaGrupoId || uid();
+    novos = Array.from({ length: total - inicio + 1 }, (_, i) => ({
+      id: i === 0 ? id : uid(), nome, compra: `${descricao} (parcela ${inicio + i}/${total})`,
+      valor, data: deslocarMesCompra(rascunho.mes, i), parcelaGrupoId: grupoId,
+      compraBase: descricao, parcelaNumero: inicio + i, totalParcelas: total,
+    }));
+  } else {
+    const { parcelaGrupoId, compraBase, parcelaNumero, totalParcelas, ...resto } = original;
+    novos = [{ ...resto, nome, compra: descricao, valor, data: `${rascunho.mes}-01` }];
+  }
+  const mantidas = compras.filter((c) => !substituir.has(c.id)).map((c) => {
+    // Vincula também as parcelas antigas anteriores, para futuras edições reconhecerem a série.
+    if (info.parcelada && !original.parcelaGrupoId && rascunho.parcelada) {
+      const d = dadosParcelamento(c);
+      const dataEsperada = deslocarMesCompra(chaveDoMes(original.data), d.numero - info.numero);
+      if (!c.parcelaGrupoId && c.nome === original.nome && d.parcelada && d.descricao === info.descricao
+        && d.total === info.total && d.numero < info.numero && chaveDoMes(c.data) === chaveDoMes(dataEsperada)) {
+        const iguais = compras.filter((outra) => outra.nome === c.nome && outra.compra === c.compra && chaveDoMes(outra.data) === chaveDoMes(c.data));
+        if (iguais.length === 1) return { ...c, parcelaGrupoId: novos[0].parcelaGrupoId, compraBase: d.descricao, parcelaNumero: d.numero, totalParcelas: d.total };
+      }
+    }
+    return c;
+  });
+  return [...mantidas, ...novos];
+}
+
+
+function limparCompartilhamento(c) {
+  const { compartilhamentoId, parteCompartilhada, nomePrincipal, nomeDivisao, valorCompartilhado, ...resto } = c;
+  return resto;
+}
+
+function dividirRegistrosCompras(registros, nomePrincipal, nomeOutraPessoa, compartilhamentoId = uid(), anteriores = []) {
+  const nome = nomePrincipal.trim(), outro = nomeOutraPessoa.trim();
+  if (!outro || nome.toLocaleLowerCase("pt-BR") === outro.toLocaleLowerCase("pt-BR"))
+    throw new Error("Informe o nome de outra pessoa para dividir a compra.");
+  return registros.flatMap((registro) => {
+    const base = limparCompartilhamento(registro);
+    const centavos = Math.round(Math.abs(base.valor) * 100);
+    if (centavos < 2) throw new Error("O valor precisa ser de pelo menos R$ 0,02 para dividir entre duas pessoas.");
+    const sinal = base.valor < 0 ? -1 : 1;
+    const valores = [Math.ceil(centavos / 2), Math.floor(centavos / 2)];
+    return [nome, outro].map((pessoa, parte) => {
+      const anterior = anteriores.find((c) => c.parteCompartilhada === parte && c.data === base.data && c.parcelaNumero === base.parcelaNumero);
+      return {
+        ...base, id: parte === 0 ? base.id : (anterior?.id || uid()), nome: pessoa,
+        valor: sinal * valores[parte] / 100, compartilhamentoId, parteCompartilhada: parte,
+        nomePrincipal: nome, nomeDivisao: outro, valorCompartilhado: base.valor,
+        ...(base.parcelaGrupoId ? { parcelaGrupoId: parte === 0 ? base.parcelaGrupoId : `${base.parcelaGrupoId}:parte2` } : {}),
+      };
+    });
+  });
+}
+
+function editarCompraComDivisao(compras, id, rascunho) {
+  const original = compras.find((c) => c.id === id);
+  if (!original) throw new Error("Esta compra não foi encontrada. Abra a edição novamente.");
+  let baseCompras = compras, idBase = id, anteriores = [], anterioresMantidas = [];
+  if (original.compartilhamentoId) {
+    anteriores = compras.filter((c) => c.compartilhamentoId === original.compartilhamentoId);
+    const principal = anteriores.find((c) => c.parteCompartilhada === 0 && c.data === original.data && c.parcelaNumero === original.parcelaNumero) || original;
+    idBase = principal.id;
+    anterioresMantidas = anteriores.filter((c) => chaveDoMes(c.data) < chaveDoMes(original.data));
+    baseCompras = compras.filter((c) => c.compartilhamentoId !== original.compartilhamentoId);
+    baseCompras.push(...anteriores.filter((c) => c.parteCompartilhada === 0 || c.id === principal.id).map((c) => ({ ...c, valor: c.valorCompartilhado })));
+  }
+  const idsExistentes = new Set(baseCompras.map((c) => c.id));
+  const atualizadas = editarCompraComParcelas(baseCompras, idBase, rascunho);
+  const afetadas = atualizadas.filter((c) => c.id === idBase || !idsExistentes.has(c.id));
+  const idsAfetados = new Set(afetadas.map((c) => c.id));
+  let mantidas = atualizadas.filter((c) => !idsAfetados.has(c.id));
+  if (original.compartilhamentoId) {
+    mantidas = mantidas.filter((c) => c.compartilhamentoId !== original.compartilhamentoId);
+    mantidas.push(...anterioresMantidas);
+  }
+  const novas = rascunho.dividir
+    ? dividirRegistrosCompras(afetadas, rascunho.nome, rascunho.dividirCom, original.compartilhamentoId || uid(), anteriores)
+    : afetadas.map(limparCompartilhamento);
+  return [...mantidas, ...novas];
+}
+
+function OpcaoDividirCompra({ ativa, onAtiva, pessoa, onPessoa, nome, valor, negativo, cor }) {
+  const magnitude = valorMascaradoParaNumero(valor);
+  const centavos = Number.isFinite(magnitude) ? Math.round(magnitude * 100) : 0;
+  const sinal = negativo ? -1 : 1;
+  return (
+    <>
+      <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
+        <input type="checkbox" checked={!!ativa} onChange={(e) => onAtiva(e.target.checked)} className="w-4 h-4" style={{ accentColor: cor }} />
+        Dividir com outra pessoa
+      </label>
+      {ativa && <>
+        <Campo label="Dividir com"><input className={inputBase} style={{ borderColor: COR.linha }} placeholder="Ex: Filipe" value={pessoa} onChange={(e) => onPessoa(e.target.value)} /></Campo>
+        <p className="text-xs" style={{ color: COR.tintaSuave }}>Informe o valor total da compra ou da parcela. A divisão será feita em duas partes iguais.</p>
+        {centavos >= 2 && <div className="rounded-xl p-3 text-sm flex flex-col gap-1" style={{ background: COR.papelEscuro }}>
+          <span>{nome.trim() || "Quem comprou"}: <strong>{fmt(sinal * Math.ceil(centavos / 2) / 100)}</strong></span>
+          <span>{pessoa.trim() || "Outra pessoa"}: <strong>{fmt(sinal * Math.floor(centavos / 2) / 100)}</strong></span>
+        </div>}
+      </>}
+    </>
+  );
+}
+
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
 function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas }) {
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
 
-  const [pessoaFiltro, setPessoaFiltro] = useState("todos");
+  // null seleciona todas as pessoas, inclusive novos nomes adicionados depois.
+  const [pessoasSelecionadas, setPessoasSelecionadas] = useState(null);
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
   const [valorNegativo, setValorNegativo] = useState(false);
+  const [dividir, setDividir] = useState(false);
+  const [dividirCom, setDividirCom] = useState("");
+  const [erroNovaCompra, setErroNovaCompra] = useState("");
   const [mesCompra, setMesCompra] = useState(mesAtualChave());
   const [parcelada, setParcelada] = useState(false);
   const [parcelaAtual, setParcelaAtual] = useState("1");
   const [totalParcelas, setTotalParcelas] = useState("");
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
+  const [erroEdicao, setErroEdicao] = useState("");
 
-  const nomesUnicos = useMemo(
-    () => [...new Set(compras.map((c) => primeiroNomeDe(c.nome)))].filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [compras]
-  );
+  const nomesUnicos = useMemo(() => {
+    const nomes = new Map();
+    compras.forEach((c) => {
+      const nome = primeiroNomeDe(c.nome);
+      if (nome) nomes.set(nome.toLocaleLowerCase("pt-BR"), nome);
+    });
+    return [...nomes.values()].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [compras]);
 
-  const comprasFiltradas = useMemo(
-    () => (pessoaFiltro === "todos" ? compras : compras.filter((c) => primeiroNomeDe(c.nome).toLowerCase() === pessoaFiltro.toLowerCase())),
-    [compras, pessoaFiltro]
-  );
+  const selecaoValida = pessoasSelecionadas === null ? null : pessoasSelecionadas.filter((nome) => nomesUnicos.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR")));
+  const todasPessoas = selecaoValida === null;
+  const pessoaFiltro = todasPessoas ? "todos" : (selecaoValida.length ? selecaoValida.join(", ") : "Nenhuma pessoa selecionada");
+  const resumoFiltro = todasPessoas ? "Todas as pessoas" : (selecaoValida.length === 1 ? selecaoValida[0] : `${selecaoValida.length} pessoas selecionadas`);
+  const alternarPessoa = (nome) => setPessoasSelecionadas((atuais) => {
+    const lista = atuais === null ? nomesUnicos : atuais;
+    const inclui = lista.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"));
+    return inclui ? lista.filter((n) => n.toLocaleLowerCase("pt-BR") !== nome.toLocaleLowerCase("pt-BR")) : [...lista, nome];
+  });
+  const comprasFiltradas = useMemo(() => {
+    if (pessoasSelecionadas === null) return compras;
+    const nomes = new Set(pessoasSelecionadas.map((nome) => nome.toLocaleLowerCase("pt-BR")));
+    return compras.filter((c) => nomes.has(primeiroNomeDe(c.nome).toLocaleLowerCase("pt-BR")));
+  }, [compras, pessoasSelecionadas]);
 
   const comprasPorMes = useMemo(() => {
     const grupos = {};
@@ -1385,6 +1557,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const totalMes = linhasMes.reduce((s, c) => s + c.valor, 0);
 
   const adicionar = () => {
+    setErroNovaCompra("");
     const magnitude = valorMascaradoParaNumero(nova.valor);
     if (!nova.nome.trim() || !nova.compra.trim() || !(magnitude > 0) || !mesCompra) return;
     const valor = valorNegativo ? -magnitude : magnitude;
@@ -1396,7 +1569,9 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       const inicio = parseInt(parcelaAtual, 10);
       const total = parseInt(totalParcelas, 10);
       if (!(inicio >= 1) || !(total >= inicio)) return;
-      const totalLimitado = Math.min(total, 120);
+      if (!Number.isInteger(Number(parcelaAtual)) || !Number.isInteger(Number(totalParcelas)) || total > 120) return;
+      const totalLimitado = total;
+      const grupoId = uid();
       novosRegistros = [];
       for (let numero = inicio; numero <= totalLimitado; numero++) {
         const dataParcela = new Date(anoBase, mesBase - 1 + (numero - inicio), 1);
@@ -1407,13 +1582,20 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
           compra: `${nova.compra.trim()} (parcela ${numero}/${totalLimitado})`,
           valor,
           data: dataStr,
+          parcelaGrupoId: grupoId, compraBase: nova.compra.trim(), parcelaNumero: numero, totalParcelas: totalLimitado,
         });
       }
     } else {
       novosRegistros = [{ id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: `${mesCompra}-01` }];
     }
 
+    if (dividir) {
+      try { novosRegistros = dividirRegistrosCompras(novosRegistros, nova.nome, dividirCom); }
+      catch (erro) { setErroNovaCompra(erro.message); return; }
+    }
     onAtualizarCompras([...compras, ...novosRegistros]);
+    setDividir(false);
+    setDividirCom("");
     setNova({ nome: "", compra: "", valor: "", data: "" });
     setValorNegativo(false);
     setParcelada(false);
@@ -1424,47 +1606,50 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   };
 
   const iniciarEdicao = (c) => {
+    const info = dadosParcelamento(c);
+    setErroEdicao("");
     setEditandoId(c.id);
-    setRascunho({ ...c, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valor) * 100))), negativo: c.valor < 0, mes: chaveDoMes(c.data) });
+    setRascunho({ ...c, nome: c.nomePrincipal || c.nome, dividir: !!c.compartilhamentoId, dividirCom: c.nomeDivisao || "", compra: info.descricao, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valorCompartilhado ?? c.valor) * 100))), negativo: c.valor < 0, mes: chaveDoMes(c.data), parcelada: info.parcelada, parcelaAtual: String(info.numero), totalParcelas: info.parcelada ? String(info.total) : "" });
   };
 
   const salvarEdicao = () => {
-    const magnitude = valorMascaradoParaNumero(rascunho.valor);
-    if (!rascunho.nome.trim() || !rascunho.compra.trim() || !(magnitude > 0) || !rascunho.mes) return;
-    const valor = rascunho.negativo ? -magnitude : magnitude;
-    onAtualizarCompras(compras.map((c) =>
-      c.id === editandoId
-        ? { ...c, nome: rascunho.nome.trim(), compra: rascunho.compra.trim(), valor, data: `${rascunho.mes}-01` }
-        : c
-    ));
-    setEditandoId(null);
-    setRascunho(null);
-    setMesSelecionado(rascunho.mes);
+    setErroEdicao("");
+    try {
+      const atualizadas = editarCompraComDivisao(compras, editandoId, rascunho);
+      onAtualizarCompras(atualizadas);
+      setMesSelecionado(rascunho.mes);
+      setEditandoId(null);
+      setRascunho(null);
+    } catch (erro) { setErroEdicao(erro.message); }
   };
 
-  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
+  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); setErroEdicao(""); };
   const excluir = (id) => onAtualizarCompras(compras.filter((c) => c.id !== id));
 
   const gerarRelatorioPdf = () => {
-    onGerarPdf({ nomeCartao, pessoaFiltro, mesSelecionado, linhas: linhasMes, total: totalMes });
+    onGerarPdf({ nomeCartao, pessoaFiltro, mostrarPessoa: todasPessoas || selecaoValida.length !== 1, mesSelecionado, linhas: linhasMes, total: totalMes });
   };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex gap-2 oculta-impressao">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <Campo label="Filtrar por pessoa">
-            <select
-              className={inputBase + " w-full"}
-              style={{ borderColor: COR.linha }}
-              value={pessoaFiltro}
-              onChange={(e) => setPessoaFiltro(e.target.value)}
-            >
-              <option value="todos">Todas as pessoas</option>
-              {nomesUnicos.map((nome) => (
-                <option key={nome} value={nome}>{nome}</option>
-              ))}
-            </select>
+            <details className="rounded-2xl border bg-white" style={{ borderColor: COR.linha }}>
+              <summary className="flex items-center justify-between gap-2 px-3 py-3 cursor-pointer text-sm" style={{ listStyle: "none" }}><span className="break-words">{resumoFiltro}</span><ChevronRight size={16} className="shrink-0" /></summary>
+              <div className="px-3 pb-3 flex flex-col gap-2" style={{ borderTop: `1px solid ${COR.linha}` }}>
+                <div className="flex flex-wrap gap-2 py-2">
+                  <button type="button" onClick={() => setPessoasSelecionadas(null)} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: corClara, color: corPrincipal }}>Todas</button>
+                  <button type="button" onClick={() => setPessoasSelecionadas([])} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: COR.papelEscuro, color: COR.tintaSuave }}>Limpar seleção</button>
+                </div>
+                <div className="flex flex-col gap-1 max-h-56 overflow-y-auto">
+                  {nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-2 py-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))} onChange={() => alternarPessoa(nome)} style={{ accentColor: corPrincipal }} className="w-4 h-4" />{nome}
+                  </label>)}
+                </div>
+                {!nomesUnicos.length && <p className="text-xs" style={{ color: COR.tintaSuave }}>Nenhuma pessoa cadastrada neste cartão.</p>}
+              </div>
+            </details>
           </Campo>
         </div>
         <div className="flex items-end">
@@ -1540,7 +1725,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
               className="w-4 h-4"
               style={{ accentColor: corPrincipal }}
             />
-            Valor negativo (pagamento antecipado / estorno)
+            Estorno
           </label>
 
           <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
@@ -1578,6 +1763,8 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
             </>
           )}
 
+          <OpcaoDividirCompra ativa={dividir} onAtiva={setDividir} pessoa={dividirCom} onPessoa={setDividirCom} nome={nova.nome} valor={nova.valor} negativo={valorNegativo} cor={corPrincipal} />
+          {erroNovaCompra && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroNovaCompra}</p>}
           <div className="flex gap-2 justify-end mt-1">
             <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
               Cancelar
@@ -1591,7 +1778,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
       {linhasMes.length === 0 && !mostrarForm && (
         <p className="text-sm text-center py-8 oculta-impressao" style={{ color: COR.tintaSuave }}>
-          Nenhuma compra {pessoaFiltro === "todos" ? "" : `de ${pessoaFiltro} `}em {rotuloDoMes(mesSelecionado)}.
+          Nenhuma compra {todasPessoas ? "" : (selecaoValida.length ? `de ${pessoaFiltro} ` : "— selecione uma ou mais pessoas — ")}em {rotuloDoMes(mesSelecionado)}.
         </p>
       )}
 
@@ -1631,11 +1818,24 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                       className="w-4 h-4"
                       style={{ accentColor: corPrincipal }}
                     />
-                    Valor negativo (pagamento antecipado / estorno)
+                    Estorno
                   </label>
+                  <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
+                    <input type="checkbox" checked={!!rascunho.parcelada} onChange={(e) => setRascunho({ ...rascunho, parcelada: e.target.checked })} className="w-4 h-4" style={{ accentColor: corPrincipal }} />
+                    Compra parcelada
+                  </label>
+                  {rascunho.parcelada && <>
+                    <Campo label="Em qual parcela ela está agora"><input className={inputBase} style={{ borderColor: COR.linha }} type="number" min="1" max="120" step="1" value={rascunho.parcelaAtual} onChange={(e) => setRascunho({ ...rascunho, parcelaAtual: e.target.value })} /></Campo>
+                    <Campo label="Total de parcelas"><input className={inputBase} style={{ borderColor: COR.linha }} type="number" min="1" max="120" step="1" value={rascunho.totalParcelas} onChange={(e) => setRascunho({ ...rascunho, totalParcelas: e.target.value })} /></Campo>
+                    <p className="text-xs" style={{ color: COR.tintaSuave }}>O valor informado é o de cada parcela. Ao salvar, esta e as próximas parcelas serão atualizadas, uma por mês. As anteriores serão mantidas.</p>
+                  </>}
+                  {!rascunho.parcelada && dadosParcelamento(c).parcelada && <p className="text-xs" style={{ color: COR.tintaSuave }}>Ao salvar sem parcelamento, esta compra terá apenas um lançamento. As próximas parcelas serão removidas; as anteriores serão mantidas.</p>}
+                  <OpcaoDividirCompra ativa={rascunho.dividir} onAtiva={(v) => setRascunho({ ...rascunho, dividir: v })} pessoa={rascunho.dividirCom} onPessoa={(v) => setRascunho({ ...rascunho, dividirCom: v })} nome={rascunho.nome} valor={rascunho.valor} negativo={rascunho.negativo} cor={corPrincipal} />
+                  {c.compartilhamentoId && <p className="text-xs" style={{ color: COR.tintaSuave }}>Esta edição atualiza as duas partes da compra. Ao desmarcar a divisão, o valor total ficará para quem comprou.</p>}
+                  {erroEdicao && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroEdicao}</p>}
                   <div className="flex gap-2 justify-end">
-                    <button onClick={cancelarEdicao} className="p-1.5 rounded-2xl" style={{ color: COR.tintaSuave }}><X size={16} /></button>
-                    <button onClick={salvarEdicao} className="p-1.5 rounded-2xl text-white" style={{ background: corPrincipal }}><Check size={16} /></button>
+                    <button aria-label="Cancelar edição" onClick={cancelarEdicao} className="p-1.5 rounded-2xl" style={{ color: COR.tintaSuave }}><X size={16} /></button>
+                    <button aria-label="Salvar edição" onClick={salvarEdicao} className="p-1.5 rounded-2xl text-white" style={{ background: corPrincipal }}><Check size={16} /></button>
                   </div>
                 </div>
               ) : (
