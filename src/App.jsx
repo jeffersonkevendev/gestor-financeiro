@@ -41,13 +41,13 @@ const MESES = [
 ];
 
 const COR = {
-  papel: "#F3EFE2",
-  papelEscuro: "#E8E1CC",
-  tinta: "#1C2333",
-  tintaSuave: "#4A5164",
-  linha: "#D3C9AE",
-  ouro: "#B8891F",
-  ouroClaro: "#E3B565",
+  papel: "#F7F9FC",
+  papelEscuro: "#EEF2F7",
+  tinta: "#14213D",
+  tintaSuave: "#64748B",
+  linha: "#E2E8F0",
+  ouro: "#2563EB",
+  ouroClaro: "#DBEAFE",
   roxo: "#820AD1",
   roxoClaro: "#F1E1FB",
   americanas: "#C81032",
@@ -56,11 +56,11 @@ const COR = {
   verdeClaro: "#DCEEE3",
   vermelho: "#A83232",
   cartao: "#FFFFFF",
-  texto: "#1C2333",
+  texto: "#14213D",
 };
 
 const CATEGORIAS = ["Moradia", "Alimentação", "Transporte", "Saúde", "Lazer", "Educação", "Assinaturas", "Outros"];
-const CORES_CATEGORIA = ["#B8891F", "#2E7D5B", "#2A6F97", "#A83232", "#7A4FB5", "#B5651D", "#4A5164", "#8A8F63"];
+const CORES_CATEGORIA = ["#2563EB", "#2E7D5B", "#2A6F97", "#A83232", "#7A4FB5", "#B5651D", "#64748B", "#8A8F63"];
 const corCategoria = (nome) => {
   const i = CATEGORIAS.indexOf(nome);
   return CORES_CATEGORIA[i >= 0 ? i : CORES_CATEGORIA.length - 1];
@@ -255,7 +255,7 @@ function TelaCarregando() {
     <div className="min-h-screen w-full flex flex-col items-center justify-center" style={{ background: COR.tinta }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&display=swap');
-        .fonte-display { font-family: 'Fraunces', serif; }
+        .fonte-display { font-family: 'Inter', ui-sans-serif, system-ui; font-weight: 700; letter-spacing: -0.025em; }
       `}</style>
       <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ border: `2px solid ${COR.ouro}` }}>
         <Wallet size={26} color={COR.ouro} strokeWidth={2} />
@@ -303,24 +303,21 @@ function TelaLogin({ erroInicial }) {
   };
 
   return (
-    <div className="min-h-screen w-full" style={{ background: COR.papel, fontFamily: "'Inter', ui-sans-serif, system-ui" }}>
+    <div className="min-h-screen w-full flex flex-col justify-center" style={{ background: COR.papel, fontFamily: "'Inter', ui-sans-serif, system-ui" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap');
-        .fonte-display { font-family: 'Fraunces', serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .fonte-display { font-family: 'Inter', ui-sans-serif, system-ui; font-weight: 700; letter-spacing: -0.025em; }
       `}</style>
-      <div className="relative pt-14 pb-20 px-6 text-center" style={{ background: COR.tinta }}>
+      <div className="relative pt-14 pb-6 px-6 text-center" style={{ background: COR.papel }}>
         <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 mx-auto" style={{ border: `2px solid ${COR.ouro}` }}>
           <Wallet size={32} color={COR.ouro} strokeWidth={2} />
         </div>
-        <h1 className="fonte-display text-3xl font-bold mb-3" style={{ color: "white" }}>Meu Caixa</h1>
-        <p className="text-sm mx-auto" style={{ color: "rgba(255,255,255,0.7)", maxWidth: 300 }}>
-          Entre com sua conta Google para acessar suas despesas e cartões, salvos na nuvem.
+        <h1 className="fonte-display text-3xl font-bold mb-3" style={{ color: COR.tinta }}>Meu Caixa</h1>
+        <p className="text-sm mx-auto" style={{ color: COR.tintaSuave, maxWidth: 300 }}>
+          Suas finanças, mais simples. Organize suas despesas e cartões em um só lugar.
         </p>
-        <svg aria-hidden="true" className="absolute left-0 bottom-0 w-full" style={{ height: 36 }} viewBox="0 0 500 60" preserveAspectRatio="none">
-          <path d="M0,30 C150,70 350,-10 500,30 L500,60 L0,60 Z" fill={COR.papel} />
-        </svg>
       </div>
-      <div className="px-6 pb-10 pt-6 flex flex-col gap-4 max-w-sm mx-auto">
+      <div className="w-full px-6 pb-10 pt-6 flex flex-col gap-4 max-w-sm mx-auto">
         <button onClick={entrarComGoogle} disabled={carregando} className="w-full h-12 flex items-center justify-center gap-3 rounded-2xl font-semibold text-sm disabled:opacity-60" style={{ background: "white", color: COR.tinta, border: `1px solid ${COR.linha}` }}>
               <svg aria-hidden="true" width="18" height="18" viewBox="0 0 48 48">
                 <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
@@ -376,7 +373,7 @@ function Campo({ label, children }) {
 }
 
 const inputBase =
-  "box-border h-10 px-2.5 rounded-md border bg-white outline-none text-sm focus:ring-2";
+  "box-border h-10 px-2.5 rounded-2xl border bg-white outline-none text-sm focus:ring-2";
 
 // Botão de excluir com confirmação em duas etapas (evita apagar sem querer)
 function BotaoExcluirConfirmar({ onConfirmar }) {
@@ -420,6 +417,7 @@ function MeuCaixaApp({ usuario }) {
   const [erroSaida, setErroSaida] = useState("");
   const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, orcamentoMensal, setOrcamentoMensal, carregando, salvando, temPendencias, erroNuvem, tentarNovamente } = useDadosNuvem(usuario.uid);
   const [mostrarMenuUsuario, setMostrarMenuUsuario] = useState(false);
+  const [mostrarListaCartoes, setMostrarListaCartoes] = useState(false);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
   const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState(null);
   const [mostrarNovaReceita, setMostrarNovaReceita] = useState(false);
@@ -570,9 +568,12 @@ function MeuCaixaApp({ usuario }) {
       style={{ background: COR.papel, color: COR.texto, fontFamily: "'Inter', ui-sans-serif, system-ui" }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
-        .fonte-display { font-family: 'Fraunces', serif; }
-        .fonte-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .fonte-display { font-family: 'Inter', ui-sans-serif, system-ui; font-weight: 700; letter-spacing: -0.025em; }
+        .fonte-mono { font-family: 'Inter', ui-sans-serif, system-ui; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+        button { -webkit-tap-highlight-color: transparent; }
+        button:focus-visible { outline: 3px solid #93C5FD; outline-offset: 3px; }
+        input, select { background: white; min-height: 40px; }
         input:focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
         .relatorio-impressao { position: fixed; top: 0; left: -10000px; width: 420px; background: white; }
       `}</style>
@@ -582,17 +583,17 @@ function MeuCaixaApp({ usuario }) {
       </div>}
 
       {/* cabeçalho */}
-      <header style={{ background: COR.tinta }} className="px-5 pt-7 pb-0 oculta-impressao">
+      <header style={{ background: COR.papel }} className="px-5 pt-7 pb-0 oculta-impressao">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: COR.ouro }}>
-                <Wallet size={18} color={COR.tinta} strokeWidth={2.5} />
+                <Wallet size={18} color="white" strokeWidth={2.5} />
               </div>
-              <h1 className="fonte-display text-2xl" style={{ color: COR.papel }}>Meu Caixa</h1>
+              <h1 className="fonte-display text-2xl" style={{ color: COR.tinta }}>Meu Caixa</h1>
             </div>
             <div className="relative">
-              <button onClick={() => setMostrarMenuUsuario((v) => !v)} className="w-8 h-8 rounded-full overflow-hidden border-2" style={{ borderColor: "#3a4257" }}>
+              <button onClick={() => setMostrarMenuUsuario((v) => !v)} className="w-8 h-8 rounded-full overflow-hidden border-2" style={{ borderColor: COR.linha }}>
                 {usuario.photoURL ? (
                   <img src={usuario.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
@@ -602,7 +603,8 @@ function MeuCaixaApp({ usuario }) {
                 )}
               </button>
               {mostrarMenuUsuario && (
-                <div className="absolute right-0 top-10 rounded-md p-3 z-50" style={{ background: COR.cartao, minWidth: 220, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+                <div role="dialog" aria-label="Perfil" className="fixed right-5 top-20 rounded-2xl p-5 z-50" style={{ background: COR.cartao, width: "min(320px, calc(100vw - 40px))", border: `1px solid ${COR.linha}`, boxShadow: "0 8px 24px rgba(15,23,42,0.12)" }}>
+                  <button aria-label="Fechar perfil" onClick={() => setMostrarMenuUsuario(false)} className="float-right p-2"><X size={18} /></button>
                   <p className="text-xs font-semibold truncate" style={{ color: COR.texto }}>{usuario.displayName || "Usuário"}</p>
                   <p className="text-[11px] truncate mb-3" style={{ color: COR.tintaSuave }}>{usuario.email}</p>
 
@@ -632,57 +634,6 @@ function MeuCaixaApp({ usuario }) {
             </div>
           </div>
 
-          <nav className="flex gap-1 items-center overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <button
-              onClick={() => setAba("inicio")}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
-              style={{ background: aba === "inicio" ? COR.papel : "transparent", color: aba === "inicio" ? COR.tinta : "#9AA1B4" }}
-            >
-              <Home size={15} /> Início
-            </button>
-            <button
-              onClick={() => setAba("despesas")}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors shrink-0 whitespace-nowrap"
-              style={{ background: aba === "despesas" ? COR.papel : "transparent", color: aba === "despesas" ? COR.tinta : "#9AA1B4" }}
-            >
-              <Wallet size={15} /> Despesas
-            </button>
-            {cartoes.map((c) => {
-              const ativo = aba === `cartao-${c.id}`;
-              return (
-                <div
-                  key={c.id}
-                  className="flex items-center shrink-0 rounded-t-lg transition-colors"
-                  style={{ background: ativo ? COR.papel : "transparent" }}
-                >
-                  <button
-                    onClick={() => setAba(`cartao-${c.id}`)}
-                    className="flex items-center gap-1.5 pl-4 pr-1.5 py-2.5 text-sm font-semibold whitespace-nowrap"
-                    style={{ color: ativo ? COR.tinta : "#9AA1B4" }}
-                  >
-                    <CreditCard size={15} /> {c.nome}
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setCartaoParaExcluir(c); }}
-                    className="pr-3 pl-0.5 py-2.5"
-                    style={{ color: ativo ? COR.tintaSuave : "#6b7280" }}
-                    title={`Excluir ${c.nome}`}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              );
-            })}
-            <button
-              onClick={() => setMostrarAddCartao((v) => !v)}
-              className="shrink-0 p-2 rounded-full ml-1"
-              style={{ color: "#9AA1B4" }}
-              title="Adicionar cartão"
-            >
-              <Plus size={16} />
-            </button>
-          </nav>
-
           {mostrarAddCartao && (
             <div className="flex gap-2 pb-3 pt-2">
               <input
@@ -690,10 +641,10 @@ function MeuCaixaApp({ usuario }) {
                 onChange={(e) => setNomeNovoCartao(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") adicionarCartao(); }}
                 placeholder="Nome do novo cartão (ex: Cartão Inter)"
-                className="flex-1 h-9 px-2.5 rounded-md border text-sm outline-none box-border"
+                className="flex-1 h-9 px-2.5 rounded-2xl border text-sm outline-none box-border"
                 style={{ borderColor: COR.linha }}
               />
-              <button onClick={adicionarCartao} className="px-3 rounded-md text-sm font-semibold text-white" style={{ background: COR.ouro }}>
+              <button onClick={adicionarCartao} className="px-3 rounded-2xl text-sm font-semibold text-white" style={{ background: COR.ouro }}>
                 Adicionar
               </button>
             </div>
@@ -702,7 +653,7 @@ function MeuCaixaApp({ usuario }) {
       </header>
 
       <main
-        className="overflow-hidden"
+        className="overflow-hidden max-w-2xl mx-auto"
         style={{ touchAction: "pan-y" }}
         onTouchStart={aoTocarInicio}
         onTouchMove={aoTocarMover}
@@ -721,6 +672,7 @@ function MeuCaixaApp({ usuario }) {
               cartoes={cartoes}
               pessoasAutomaticas={pessoasAutomaticas}
               primeiroNome={primeiroNomeDoUsuario}
+              pagamentosCartaoPagos={pagamentosCartaoPagos}
               onIrPara={setAba}
               onAbrirCalculadora={() => setMostrarCalculadora(true)}
             />
@@ -752,15 +704,30 @@ function MeuCaixaApp({ usuario }) {
         </div>
       </main>
 
-      {/* botão flutuante da calculadora */}
-      <button
-        onClick={() => setMostrarCalculadora(true)}
-        className="fixed z-40 w-14 h-14 rounded-full flex items-center justify-center oculta-impressao"
-        style={{ background: COR.ouro, right: 18, bottom: 22, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" }}
-        title="Calculadora"
-      >
-        <IconeCalculadora size={22} color="white" />
-      </button>
+      <nav aria-label="Navegação principal" className="fixed bottom-0 left-0 right-0 z-40 oculta-impressao" style={{ background: COR.cartao, borderTop: `1px solid ${COR.linha}`, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <div className="max-w-2xl mx-auto flex justify-around py-2">
+          {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
+            { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
+            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => setMostrarListaCartoes(true) },
+            { label: "Perfil", Icon: User, ativo: mostrarMenuUsuario, acao: () => setMostrarMenuUsuario((v) => !v) }
+          ].map(({ label, Icon, ativo, acao }) => (
+            <button key={label} aria-current={ativo ? "page" : undefined} onClick={() => { if (label !== "Perfil") setMostrarMenuUsuario(false); acao(); }} className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
+              <Icon size={21} /><span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+      {mostrarListaCartoes && (
+        <div role="dialog" aria-modal="true" aria-label="Seus cartões" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(15,23,42,0.35)" }} onClick={() => setMostrarListaCartoes(false)}>
+          <div className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "80vh" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Seus cartões</h2><button aria-label="Fechar cartões" onClick={() => setMostrarListaCartoes(false)} className="p-2"><X size={20} /></button></div>
+            {cartoes.map((c) => <button key={c.id} onClick={() => { setAba(`cartao-${c.id}`); setMostrarListaCartoes(false); }} className="flex items-center gap-3 p-4 rounded-xl border text-left" style={{ borderColor: COR.linha }}><CreditCard size={22} color={c.cor} /><span className="flex-1">{c.nome}</span><ChevronRight size={18} /></button>)}
+            {!cartoes.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado.</p>}
+            <button onClick={() => { setMostrarListaCartoes(false); setMostrarAddCartao(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
+          </div>
+        </div>
+      )}
+
       <Calculadora aberta={mostrarCalculadora} aoFechar={() => setMostrarCalculadora(false)} />
 
       {/* modal de confirmação — excluir cartão */}
@@ -770,7 +737,7 @@ function MeuCaixaApp({ usuario }) {
           style={{ background: "rgba(28,35,51,0.6)" }}
           onClick={() => setCartaoParaExcluir(null)}
         >
-          <div className="rounded-lg p-5 max-w-sm w-full" style={{ background: COR.cartao }} onClick={(e) => e.stopPropagation()}>
+          <div className="rounded-2xl p-5 max-w-sm w-full" style={{ background: COR.cartao }} onClick={(e) => e.stopPropagation()}>
             <p className="fonte-display text-lg mb-2" style={{ color: COR.texto }}>
               Excluir {cartaoParaExcluir.nome}?
             </p>
@@ -778,10 +745,10 @@ function MeuCaixaApp({ usuario }) {
               Isso vai apagar permanentemente {cartaoParaExcluir.compras.length === 1 ? "a compra registrada" : "as compras registradas"} nesse cartão. Essa ação não pode ser desfeita.
             </p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setCartaoParaExcluir(null)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
+              <button onClick={() => setCartaoParaExcluir(null)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
                 Cancelar
               </button>
-              <button onClick={confirmarExclusaoCartao} className="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style={{ background: COR.vermelho }}>
+              <button onClick={confirmarExclusaoCartao} className="px-3 py-1.5 text-sm font-semibold rounded-2xl text-white" style={{ background: COR.vermelho }}>
                 Excluir cartão
               </button>
             </div>
@@ -962,7 +929,7 @@ function Calculadora({ aberta, aoFechar }) {
 }
 
 // ===================== ABA INÍCIO =====================
-function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPara, onAbrirCalculadora }) {
+function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirCalculadora }) {
   const mesAtual = mesAtualChave();
 
   const despesasMes = useMemo(() => despesas.filter((d) => chaveDoMes(d.vencimento) === mesAtual), [despesas, mesAtual]);
@@ -979,6 +946,8 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPa
 
   const somaCartoesMes = cartoesComTotal.reduce((s, c) => s + c.totalMes, 0);
   const totalGeralMes = totalDespesasReais + somaCartoesMes;
+  const totalPagoMes = despesasMes.filter((d) => d.paga).reduce((s, d) => s + d.valor, 0)
+    + cartoesComTotal.filter((c) => pagamentosCartaoPagos[`${c.id}-${mesAtual}`]).reduce((s, c) => s + c.totalMes, 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -991,19 +960,22 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPa
 
       <button
         onClick={() => onIrPara("despesas")}
-        className="text-left rounded-md px-5 py-4"
+        className="text-left rounded-2xl px-5 py-4"
         style={{
-          background: COR.tinta,
-          backgroundImage: `repeating-linear-gradient(90deg, transparent, transparent 7px, ${COR.papel}22 7px, ${COR.papel}22 8px)`,
+          background: COR.ouro, boxShadow: "0 8px 20px rgba(37,99,235,0.15)",
         }}
       >
         <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>Despesas deste mês</p>
         <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalGeralMes)}</p>
-        <p className="text-xs mt-1" style={{ color: "#9AA1B4" }}>
+        <p className="text-xs mt-1" style={{ color: "#DBEAFE" }}>
           Despesas: <span className="fonte-mono">{fmt(totalDespesasReais)}</span> · Cartões: <span className="fonte-mono">{fmt(somaCartoesMes)}</span>
         </p>
       </button>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}><p className="flex items-center gap-2 text-sm" style={{ color: COR.tintaSuave }}><CheckCircle2 size={18} color={COR.verde} />Pago</p><p className="fonte-mono font-bold mt-2">{fmt(totalPagoMes)}</p></div>
+        <div className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}><p className="flex items-center gap-2 text-sm" style={{ color: COR.tintaSuave }}><Circle size={18} color="#D97706" />Pendente</p><p className="fonte-mono font-bold mt-2">{fmt(totalGeralMes - totalPagoMes)}</p></div>
+      </div>
       <div>
         <p className="text-sm font-semibold mb-2" style={{ color: COR.texto }}>Cartões</p>
         <div className="flex flex-col gap-2">
@@ -1011,7 +983,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPa
             <button
               key={c.id}
               onClick={() => onIrPara(`cartao-${c.id}`)}
-              className="flex items-center justify-between rounded-lg px-4 py-3"
+              className="flex items-center justify-between rounded-2xl px-4 py-3"
               style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -1027,13 +999,16 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPa
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+      <button onClick={() => onIrPara("despesas")} className="flex items-center justify-center gap-2 rounded-2xl p-4 text-sm font-semibold" style={{ background: COR.cartao, border: `1px solid ${COR.linha}`, color: COR.ouro }}><Plus size={18} />Despesas</button>
       <button
         onClick={onAbrirCalculadora}
-        className="flex items-center justify-center gap-2 rounded-md py-3 text-sm font-semibold text-white"
+        className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white"
         style={{ background: COR.ouro }}
       >
-        <IconeCalculadora size={16} /> Abrir calculadora
+        <IconeCalculadora size={16} /> Calculadora
       </button>
+      </div>
     </div>
   );
 }
@@ -1042,6 +1017,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, onIrPa
 function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [filtro, setFiltro] = useState("Todas");
   const [nova, setNova] = useState({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
@@ -1091,6 +1067,8 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
     chavePagamento: `${f.id}-${mesSelecionado}`,
     pago: !!pagamentosCartaoPagos[`${f.id}-${mesSelecionado}`],
   }));
+  const linhasVisiveis = linhas.filter((d) => filtro === "Todas" || (filtro === "Pagas" ? d.paga : !d.paga));
+  const cartoesVisiveis = totaisCartoes.filter((f) => f.total > 0 && (filtro === "Todas" || (filtro === "Pagas" ? f.pago : !f.pago)));
   const somaCartoes = totaisCartoes.reduce((s, f) => s + f.total, 0);
   const totalDespesasMes = linhas.reduce((s, d) => s + d.valor, 0);
   const totalMes = totalDespesasMes + somaCartoes;
@@ -1145,19 +1123,17 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
 
       {/* fita de total - elemento assinatura */}
       <div
-        className="relative rounded-md px-5 py-4"
+        className="relative rounded-2xl px-5 py-4"
         style={{
-          background: COR.tinta,
-          backgroundImage:
-            `repeating-linear-gradient(90deg, transparent, transparent 7px, ${COR.papel}22 7px, ${COR.papel}22 8px)`,
+          background: COR.ouro, boxShadow: "0 8px 20px rgba(37,99,235,0.15)",
         }}
       >
         <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>
           Total de despesas — {rotuloDoMes(mesSelecionado)}
         </p>
         <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalMes)}</p>
-        {linhas.length > 0 && (
-          <p className="text-xs mt-1" style={{ color: "#9AA1B4" }}>
+        {(linhas.length > 0 || somaCartoes > 0) && (
+          <p className="text-xs mt-1" style={{ color: "#DBEAFE" }}>
             Pago: <span className="fonte-mono">{fmt(totalPago)}</span> · Pendente: <span className="fonte-mono">{fmt(totalPendente)}</span>
           </p>
         )}
@@ -1165,14 +1141,15 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
 
       <button
         onClick={() => setMostrarForm((v) => !v)}
-        className="flex items-center justify-center gap-2 rounded-md py-2.5 text-sm font-semibold border-2 border-dashed transition-colors"
-        style={{ borderColor: COR.ouro, color: COR.ouro }}
+        className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-colors"
+        style={{ background: COR.ouro, color: "white" }}
       >
         <Plus size={16} /> Adicionar despesa
       </button>
 
+      <div className="flex gap-2" aria-label="Filtrar despesas">{["Todas", "Pendentes", "Pagas"].map((f) => <button key={f} aria-pressed={filtro === f} onClick={() => setFiltro(f)} className="px-4 py-2 rounded-full text-sm font-semibold" style={{ background: filtro === f ? COR.ouro : COR.papelEscuro, color: filtro === f ? "white" : COR.tintaSuave }}>{f}</button>)}</div>
       {mostrarForm && (
-        <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <Campo label="Descrição">
             <input
               className={inputBase}
@@ -1206,12 +1183,12 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
             />
           </Campo>
           <div className="flex gap-2 justify-end mt-1">
-            <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
+            <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
               Cancelar
             </button>
             <button
               onClick={adicionar}
-              className="px-3 py-1.5 text-sm font-semibold rounded-md text-white"
+              className="px-3 py-1.5 text-sm font-semibold rounded-2xl text-white"
               style={{ background: COR.ouro }}
             >
               Salvar
@@ -1226,9 +1203,10 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
         </p>
       )}
 
-      {(linhas.length > 0 || somaCartoes > 0) && (
-        <div className="rounded-lg overflow-hidden" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
-          {linhas.map((d, i) => (
+      {filtro !== "Todas" && !linhasVisiveis.length && !cartoesVisiveis.length && <p role="status" className="text-sm text-center py-5" style={{ color: COR.tintaSuave }}>Nenhuma conta {filtro === "Pagas" ? "paga" : "pendente"} neste mês.</p>}
+      {(linhasVisiveis.length > 0 || cartoesVisiveis.length > 0) && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+          {linhasVisiveis.map((d, i) => (
             <div key={d.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === d.id ? (
                 <div className="p-3 flex flex-col gap-2" style={{ background: COR.papelEscuro }}>
@@ -1253,8 +1231,8 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                     onChange={(e) => setRascunho({ ...rascunho, vencimento: e.target.value })}
                   />
                   <div className="flex gap-2 justify-end">
-                    <button onClick={cancelarEdicao} className="p-1.5 rounded-md" style={{ color: COR.tintaSuave }}><X size={16} /></button>
-                    <button onClick={salvarEdicao} className="p-1.5 rounded-md text-white" style={{ background: COR.ouro }}><Check size={16} /></button>
+                    <button onClick={cancelarEdicao} className="p-1.5 rounded-2xl" style={{ color: COR.tintaSuave }}><X size={16} /></button>
+                    <button onClick={salvarEdicao} className="p-1.5 rounded-2xl text-white" style={{ background: COR.ouro }}><Check size={16} /></button>
                   </div>
                 </div>
               ) : (
@@ -1297,7 +1275,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
             </div>
           ))}
 
-          {totaisCartoes.filter((f) => f.total > 0).map((f, idx) => (
+          {cartoesVisiveis.map((f, idx) => (
             <div key={f.id} style={{ borderTop: (linhas.length || idx > 0) ? `1px solid ${COR.linha}` : "none" }}>
               <div className="px-3 py-2.5">
                 <div className="flex items-start gap-3">
@@ -1328,7 +1306,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
       )}
 
       {dadosGrafico.length > 0 && (
-        <div className="rounded-lg p-4" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-2xl p-4" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <p className="text-sm font-semibold mb-3" style={{ color: COR.texto }}>Evolução mensal</p>
           <div style={{ width: "100%", height: 200 }}>
             <ResponsiveContainer>
@@ -1473,7 +1451,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
           <button
             onClick={gerarRelatorioPdf}
             disabled={linhasMes.length === 0 || gerandoImagem}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold text-white disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-sm font-semibold text-white disabled:opacity-40"
             style={{ background: COR.tinta }}
             title={pessoaFiltro === "todos" ? "Gera uma imagem do relatório do mês selecionado" : `Gera uma imagem do relatório de ${pessoaFiltro} no mês selecionado`}
           >
@@ -1484,7 +1462,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
       <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={corPrincipal} />
 
-      <div className="rounded-md px-5 py-4 oculta-impressao" style={{ background: corPrincipal }}>
+      <div className="rounded-2xl px-5 py-4 oculta-impressao" style={{ background: corPrincipal }}>
         <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: corClara }}>
           {pessoaFiltro === "todos" ? `Total no ${nomeCartao}` : `Total de ${pessoaFiltro}`} — {rotuloDoMes(mesSelecionado)}
         </p>
@@ -1493,14 +1471,14 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
       <button
         onClick={() => setMostrarForm((v) => !v)}
-        className="flex items-center justify-center gap-2 rounded-md py-2.5 text-sm font-semibold border-2 border-dashed oculta-impressao"
+        className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-sm font-semibold border-2 border-dashed oculta-impressao"
         style={{ borderColor: corPrincipal, color: corPrincipal }}
       >
         <Plus size={16} /> Adicionar compra
       </button>
 
       {mostrarForm && (
-        <div className="rounded-lg p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+        <div className="rounded-2xl p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <Campo label="Nome de quem comprou">
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
@@ -1581,10 +1559,10 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
           )}
 
           <div className="flex gap-2 justify-end mt-1">
-            <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-md" style={{ color: COR.tintaSuave }}>
+            <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
               Cancelar
             </button>
-            <button onClick={adicionar} className="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style={{ background: corPrincipal }}>
+            <button onClick={adicionar} className="px-3 py-1.5 text-sm font-semibold rounded-2xl text-white" style={{ background: corPrincipal }}>
               Salvar
             </button>
           </div>
@@ -1598,7 +1576,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       )}
 
       {linhasMes.length > 0 && (
-        <div className="rounded-lg oculta-impressao overflow-y-auto max-h-96" style={{ background: COR.cartao, border: `1px solid ${COR.linha}`, paddingBottom: 64 }}>
+        <div className="rounded-2xl oculta-impressao overflow-y-auto max-h-96" style={{ background: COR.cartao, border: `1px solid ${COR.linha}`, paddingBottom: 64 }}>
           {linhasMes.map((c, i) => (
             <div key={c.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === c.id ? (
@@ -1636,8 +1614,8 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     Valor negativo (pagamento antecipado / estorno)
                   </label>
                   <div className="flex gap-2 justify-end">
-                    <button onClick={cancelarEdicao} className="p-1.5 rounded-md" style={{ color: COR.tintaSuave }}><X size={16} /></button>
-                    <button onClick={salvarEdicao} className="p-1.5 rounded-md text-white" style={{ background: corPrincipal }}><Check size={16} /></button>
+                    <button onClick={cancelarEdicao} className="p-1.5 rounded-2xl" style={{ color: COR.tintaSuave }}><X size={16} /></button>
+                    <button onClick={salvarEdicao} className="p-1.5 rounded-2xl text-white" style={{ background: corPrincipal }}><Check size={16} /></button>
                   </div>
                 </div>
               ) : (
