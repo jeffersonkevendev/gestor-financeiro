@@ -143,6 +143,15 @@ const mesAtualChave = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
+// A partir do dia 9, o resumo inicial antecipa o mês seguinte.
+const mesResumoInicial = (data = new Date()) => {
+  const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(data);
+  const obter = (tipo) => Number(partes.find((p) => p.type === tipo).value);
+  let ano = obter("year"), mes = obter("month");
+  if (obter("day") >= 9) { mes++; if (mes > 12) { mes = 1; ano++; } }
+  return `${ano}-${String(mes).padStart(2, "0")}`;
+};
+
 // Preenche todos os meses entre o mais antigo e o mais recente (incluindo o mês atual), sem buracos.
 const preencherIntervaloMeses = (chaves) => {
   const todas = [...new Set([...chaves, mesAtualChave()])];
@@ -963,7 +972,18 @@ function Calculadora({ aberta, aoFechar }) {
 
 // ===================== ABA INÍCIO =====================
 function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirCalculadora }) {
-  const mesAtual = mesAtualChave();
+  const [mesAtual, setMesAtual] = useState(() => mesResumoInicial());
+  useEffect(() => {
+    const atualizarMes = () => setMesAtual(mesResumoInicial());
+    const intervalo = window.setInterval(atualizarMes, 60000);
+    window.addEventListener("focus", atualizarMes);
+    document.addEventListener("visibilitychange", atualizarMes);
+    return () => {
+      window.clearInterval(intervalo);
+      window.removeEventListener("focus", atualizarMes);
+      document.removeEventListener("visibilitychange", atualizarMes);
+    };
+  }, []);
 
   const despesasMes = useMemo(() => despesas.filter((d) => chaveDoMes(d.vencimento) === mesAtual), [despesas, mesAtual]);
   const totalDespesasReais = despesasMes.reduce((s, d) => s + d.valor, 0);
@@ -1294,7 +1314,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                 <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-1 shrink-0 p-1" aria-label={`${f.pago ? "Marcar como pendente" : "Marcar como paga"}: ${f.label}`} title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
                   {f.pago ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
                 </button>
-                <div className="min-w-0 flex-1 pt-1"><p className="text-base font-bold break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>Fatura do cartão</p></div>
+                <div className="min-w-0 flex-1 pt-1"><p className="text-base font-bold break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{f.id === "nubank" || /nu\s*bank/i.test(f.label) ? `Vence em 08/${mesSelecionado.slice(5, 7)}/${mesSelecionado.slice(0, 4)}` : "Fatura do cartão"}</p></div>
                 <div className="flex flex-col items-end gap-2 pt-1 shrink-0"><span className="fonte-mono text-base font-bold">{fmt(f.total)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: f.pago ? COR.verdeClaro : "#FFEDD5", color: f.pago ? COR.verde : "#9A3412" }}>{f.pago ? "Paga" : "Pendente"}</span></div>
               </div>
             </div>
@@ -1701,8 +1721,12 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
       <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={corPrincipal} />
 
-      <div className="rounded-2xl px-5 py-4 oculta-impressao" style={{ background: corPrincipal }}>
-        <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
+      <div className="oculta-impressao">
+        <h2 className="text-base font-bold mb-2" style={{ color: COR.ouro }}>Fatura Atual</h2>
+        <div className="rounded-2xl px-5 py-4" style={{ background: corPrincipal }}>
+          <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
+          {(cartao.id === "nubank" || /nu\s*bank/i.test(nomeCartao)) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: 08 de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
+        </div>
       </div>
 
       <button
