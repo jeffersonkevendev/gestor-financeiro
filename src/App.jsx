@@ -754,6 +754,8 @@ function MeuCaixaApp({ usuario }) {
                   setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
                 }
                 onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "compra", cartaoId: cartao.id, itens, label: itens.length > 1 ? "Compra e parcelas excluídas" : "Compra excluída" })}
+                primeiroNomeUsuario={primeiroNomeDoUsuario}
+                onAtualizarRecebimentos={(chave, registro) => setCartoes((prev) => prev.map((c) => c.id === cartao.id ? { ...c, recebimentosPorPessoa: { ...(c.recebimentosPorPessoa || {}), [chave]: registro } } : c))}
                 onGerarPdf={gerarRelatorio}
                 gerandoImagem={gerandoImagem}
                 onPedirExclusao={() => setCartaoParaExcluir(cartao)}
@@ -1638,7 +1640,7 @@ function OpcaoDividirCompra({ ativa, onAtiva, pessoa, onPessoa, nome, valor, neg
 }
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
-function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
+function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
   const [ocultarValores, setOcultarValores] = useState(false);
   const valorVisivel = (valor) => ocultarValores ? "R$ ••••" : fmt(valor);
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
@@ -1680,6 +1682,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const [erroEdicao, setErroEdicao] = useState("");
   const [erroExclusao, setErroExclusao] = useState("");
   const [buscaCompra, setBuscaCompra] = useState("");
+  const [mostrarResumoPessoas, setMostrarResumoPessoas] = useState(false);
 
   const nomesUnicos = useMemo(() => {
     const nomes = new Map();
@@ -1866,6 +1869,9 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       </div>
 
       <div className="flex items-center gap-2 rounded-2xl border px-3 bg-white oculta-impressao" style={{ borderColor: COR.linha }}><Search size={18} color={COR.tintaSuave} /><input aria-label="Buscar compras" placeholder="Buscar compra ou pessoa" value={buscaCompra} onChange={(e) => setBuscaCompra(e.target.value)} className="busca-compras flex-1 min-w-0 py-3 text-sm outline-none" />{buscaCompra && <button aria-label="Limpar busca" onClick={() => setBuscaCompra("")} className="p-2"><X size={16} /></button>}</div>
+
+      <button type="button" onClick={() => setMostrarResumoPessoas(true)} className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}><User size={18} />Resumo por pessoa</button>
+      {mostrarResumoPessoas && <ResumoPessoas cartao={cartao} mes={mesSelecionado} primeiroNomeUsuario={primeiroNomeUsuario} ocultarValores={ocultarValores} onFechar={() => setMostrarResumoPessoas(false)} onAtualizarRecebimentos={onAtualizarRecebimentos} onVerCompras={(nome) => { setPessoasSelecionadas([nome]); setBuscaCompra(""); setMostrarResumoPessoas(false); }} />}
 
       {mostrarForm && (
         <div className="rounded-2xl p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
@@ -2108,4 +2114,49 @@ function GraficosTab({ despesas, cartoes, pessoasAutomaticas, onVoltar }) {
       {dados.length ? <div style={{ width: "100%", height: 230 }}><ResponsiveContainer><BarChart data={dados}><CartesianGrid strokeDasharray="3 3" stroke={COR.linha} /><XAxis dataKey="mesRotulo" tick={{ fontSize: 10, fill: COR.tintaSuave }} tickLine={false} /><YAxis width={56} tick={{ fontSize: 10, fill: COR.tintaSuave }} tickFormatter={(v) => `R$${v}`} /><Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: 12, borderColor: COR.linha }} /><Bar dataKey={grafico.chave} name={grafico.chave === "despesas" ? "Despesas" : "Fatura"} fill={COR.ouro} radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div> : <p className="text-sm py-6" style={{ color: COR.tintaSuave }}>Adicione despesas ou compras para ver a evolução mensal.</p>}
     </section>)}
   </div>;
+}
+
+function agruparResumoPessoas(compras, mes, primeiroNomeUsuario, recebimentos = {}) {
+  const grupos = new Map();
+  for (const compra of compras || []) {
+    if (chaveDoMes(compra.data) !== mes) continue;
+    const nome = primeiroNomeDe(compra.nome) || "Sem nome", id = nome.toLocaleLowerCase("pt-BR");
+    const grupo = grupos.get(id) || { id, nome, totalCentavos: 0, quantidade: 0 };
+    grupo.totalCentavos += Math.round(Number(compra.valor || 0) * 100); grupo.quantidade++;
+    grupos.set(id, grupo);
+  }
+  const proprio = primeiroNomeDe(primeiroNomeUsuario || "").toLocaleLowerCase("pt-BR");
+  return [...grupos.values()].map((g) => {
+    const chave = `${mes}:${g.id}`, registro = recebimentos[chave];
+    return { ...g, chave, total: g.totalCentavos / 100, suaParte: g.id === proprio, recebido: g.totalCentavos > 0 && !!registro?.recebido && registro.totalCentavos === g.totalCentavos };
+  }).sort((a, b) => Number(b.suaParte) - Number(a.suaParte) || a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function ResumoPessoas({ cartao, mes, primeiroNomeUsuario, ocultarValores, onFechar, onAtualizarRecebimentos, onVerCompras }) {
+  useEffect(() => {
+    const fechar = (e) => { if (e.key === "Escape") onFechar(); };
+    document.addEventListener("keydown", fechar);
+    const anterior = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", fechar); document.body.style.overflow = anterior; };
+  }, []);
+  const pessoas = agruparResumoPessoas(cartao.compras, mes, primeiroNomeUsuario, cartao.recebimentosPorPessoa);
+  const total = pessoas.reduce((s, p) => s + p.totalCentavos, 0) / 100;
+  const valoresAReceber = pessoas.filter((p) => p.totalCentavos > 0);
+  const recebido = valoresAReceber.filter((p) => p.recebido).reduce((s, p) => s + p.totalCentavos, 0) / 100;
+  const pendente = valoresAReceber.filter((p) => !p.recebido).reduce((s, p) => s + p.totalCentavos, 0) / 100;
+  const valor = (v) => ocultarValores ? "R$ ••••" : fmt(v);
+  return createPortal(<div role="dialog" aria-modal="true" aria-label="Resumo por pessoa" className="fixed inset-0 z-[70] flex items-center justify-center p-4 oculta-impressao" style={{ background: "rgba(15,23,42,0.4)" }} onClick={onFechar}>
+    <div className="w-full max-w-lg rounded-3xl p-5 overflow-y-auto" style={{ background: COR.papel, maxHeight: "85dvh" }} onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Resumo por pessoa</h2><button type="button" autoFocus aria-label="Fechar resumo" onClick={onFechar} className="p-2 rounded-xl"><X size={22} /></button></div>
+      <p className="text-sm mt-1 mb-4" style={{ color: COR.tintaSuave }}>{cartao.nome} · {rotuloDoMes(mes)}</p>
+      <div className="rounded-2xl border p-4 mb-4" style={{ background: COR.cartao, borderColor: COR.linha }}><p className="text-sm" style={{ color: COR.tintaSuave }}>Total da fatura</p><p className="text-2xl font-bold mt-1">{valor(total)}</p></div>
+      <div className="flex flex-col gap-3">{pessoas.map((p) => <div key={p.id} className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}>
+        <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{p.nome}</h3><p className="font-bold mt-1">{valor(p.total)}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{p.quantidade} {p.quantidade === 1 ? "lançamento" : "lançamentos"}</p></div><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: p.total <= 0 ? COR.papelEscuro : p.recebido ? COR.verdeClaro : "#FEF0D6", color: p.total <= 0 ? COR.tintaSuave : p.recebido ? COR.verde : "#92400E" }}>{p.total <= 0 ? "Sem valor a receber" : p.recebido ? "Recebido" : "Pendente"}</span></div>
+        <div className="flex flex-wrap gap-2 mt-3">{p.total > 0 && <button type="button" onClick={() => onAtualizarRecebimentos(p.chave, { recebido: !p.recebido, totalCentavos: p.totalCentavos, atualizadoEm: new Date().toISOString() })} className="rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}>{p.recebido ? "Desfazer recebimento" : "Marcar como recebido"}</button>}<button type="button" onClick={() => onVerCompras(p.nome)} className="rounded-xl px-3 py-2 text-xs font-semibold" style={{ color: COR.ouro }}>Ver compras</button></div>
+      </div>)}</div>
+      {!pessoas.length && <p className="text-sm py-5" style={{ color: COR.tintaSuave }}>Nenhuma compra neste mês.</p>}
+      <div className="grid grid-cols-2 gap-3 rounded-2xl border p-4 mt-4" style={{ background: COR.cartao, borderColor: COR.linha }}><div><p className="text-xs" style={{ color: COR.tintaSuave }}>A receber</p><p className="font-bold mt-1" style={{ color: "#92400E" }}>{valor(pendente)}</p></div><div><p className="text-xs" style={{ color: COR.tintaSuave }}>Recebido</p><p className="font-bold mt-1" style={{ color: COR.verde }}>{valor(recebido)}</p></div></div>
+      <p className="text-xs mt-3" style={{ color: COR.tintaSuave }}>Os totais incluem sua parte. Marcar como recebido não altera o pagamento da fatura. Se o total da pessoa mudar, o recebimento deverá ser confirmado novamente.</p>
+    </div>
+  </div>, document.body);
 }
