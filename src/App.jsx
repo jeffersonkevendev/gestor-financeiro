@@ -750,6 +750,9 @@ function MeuCaixaApp({ usuario }) {
             <div key={cartao.id} className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0">
               <CartaoTab
                 cartao={cartao}
+                ativo={aba === `cartao-${cartao.id}`}
+                ferramentasHabilitadas={!mostrarListaCartoes && !cartaoParaExcluir && !mostrarCalculadora && !ultimaExclusao}
+                onAbrirCalculadora={() => setMostrarCalculadora(true)}
                 onAtualizarCompras={(novasCompras) =>
                   setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: typeof novasCompras === "function" ? novasCompras(c.compras || []) : novasCompras } : c)))
                 }
@@ -839,7 +842,7 @@ function MeuCaixaApp({ usuario }) {
         <span className="flex-1 text-sm">{ultimaExclusao.label}</span><button onClick={desfazerExclusao} className="text-sm font-bold py-2" style={{ color: "#93C5FD" }}>Desfazer</button><button aria-label="Fechar aviso de exclusão" onClick={() => setUltimaExclusao(null)} className="p-1"><X size={16} /></button>
       </div>}
 
-      {(aba === "despesas" || aba.startsWith("cartao-")) && !mostrarCalculadora && !mostrarListaCartoes && !cartaoParaExcluir && !ultimaExclusao && (
+      {aba === "despesas" && !mostrarCalculadora && !mostrarListaCartoes && !cartaoParaExcluir && !ultimaExclusao && (
         <button type="button" aria-label="Abrir calculadora" title="Calculadora" onClick={() => setMostrarCalculadora(true)} className="fixed z-40 rounded-full flex items-center justify-center oculta-impressao" style={{ width: 56, height: 56, right: "max(20px, calc((100vw - 672px) / 2 + 20px))", bottom: "calc(100px + env(safe-area-inset-bottom, 0px))", background: COR.ouro, color: "#FFFFFF", boxShadow: "0 6px 18px rgba(37,99,235,0.3)" }}><IconeCalculadora size={25} /></button>
       )}
 
@@ -1649,7 +1652,7 @@ function OpcaoDividirCompra({ ativa, onAtiva, pessoa, onPessoa, nome, valor, neg
 }
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
-function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
+function CartaoTab({ cartao, ativo, ferramentasHabilitadas, onAbrirCalculadora, primeiroNomeUsuario, onAtualizarRecebimentos, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
   const [ocultarValores, setOcultarValores] = useState(false);
   const valorVisivel = (valor) => ocultarValores ? "R$ ••••" : fmt(valor);
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
@@ -1693,6 +1696,7 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
   const [buscaCompra, setBuscaCompra] = useState("");
   const [mostrarResumoPessoas, setMostrarResumoPessoas] = useState(false);
   const [mostrarVoz, setMostrarVoz] = useState(false);
+  const [ferramenta, setFerramenta] = useState(null);
 
   const nomesUnicos = useMemo(() => {
     const nomes = new Map();
@@ -1779,6 +1783,7 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
     setParcelaAtual("1");
     setTotalParcelas("");
     setMostrarForm(false);
+    setFerramenta(null);
     setMesSelecionado(chaveDoMes(novosRegistros[0].data));
   };
 
@@ -1829,67 +1834,33 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
         </div>
       </div>
 
-      <button
-        onClick={() => setMostrarForm((v) => !v)}
-        className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-sm font-semibold border-2 border-dashed oculta-impressao"
-        style={{ borderColor: corPrincipal, color: corPrincipal }}
-      >
-        <Plus size={16} /> Adicionar compra
-      </button>
-
-      <button type="button" onClick={() => setMostrarVoz(true)} className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold oculta-impressao" style={{ background: COR.ouroClaro, color: COR.ouro }}><Mic size={18} />Adicionar por voz</button>
-      {mostrarVoz && <CompraPorVoz nomeUsuario={primeiroNomeUsuario} cartao={cartao} onFechar={() => setMostrarVoz(false)} onAdicionar={(registros, mes) => { onAtualizarCompras((atuais) => [...atuais, ...registros]); setPessoasSelecionadas(null); setBuscaCompra(""); setMesSelecionado(mes); }} onDesfazer={(ids) => onAtualizarCompras((atuais) => atuais.filter((c) => !ids.includes(c.id)))} />}
-
-      <div className="flex gap-2 oculta-impressao">
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-col gap-1 text-xs w-full">
-            <span className="uppercase tracking-wide font-semibold leading-tight min-h-[32px] flex items-end" style={{ color: COR.tintaSuave }}>Filtrar por pessoa</span>
-            <div ref={filtroPessoasRef} className="relative filtro-pessoas">
-              <button ref={botaoFiltroRef} type="button" aria-expanded={menuPessoasAberto} aria-controls={`menu-pessoas-${cartao.id}`} onClick={() => setMenuPessoasAberto((v) => !v)} className="w-full h-11 rounded-2xl border flex items-center justify-between gap-2 px-3 text-sm text-left" style={{ background: COR.cartao, borderColor: menuPessoasAberto ? corPrincipal : COR.linha }}>
-                <span className="truncate">{resumoFiltro}</span>
-                <ChevronRight size={16} className="shrink-0" style={{ transform: menuPessoasAberto ? "rotate(-90deg)" : "rotate(90deg)", transition: "transform 0.15s" }} />
-              </button>
-              {menuPessoasAberto && <div id={`menu-pessoas-${cartao.id}`} aria-label="Selecionar pessoas" className="absolute left-0 top-full mt-2 z-50 rounded-2xl border p-3 flex flex-col gap-2" style={{ width: "min(320px, calc(100vw - 48px))", maxHeight: "min(380px, 55vh)", background: COR.cartao, borderColor: COR.linha, boxShadow: "0 12px 32px rgba(15,23,42,0.18)" }}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold" style={{ color: COR.tinta }}>Selecionar pessoas</span>
-                  <button type="button" aria-label="Fechar filtro" onClick={() => { setMenuPessoasAberto(false); botaoFiltroRef.current?.focus(); }} className="p-2 rounded-lg"><X size={16} /></button>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setPessoasSelecionadas(null)} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: corClara, color: corPrincipal }}>Todas</button>
-                  <button type="button" onClick={() => setPessoasSelecionadas([])} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: COR.papelEscuro, color: COR.tintaSuave }}>Limpar seleção</button>
-                </div>
-                <div className="flex flex-col min-h-0 overflow-y-auto">
-                  {nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm cursor-pointer shrink-0" style={{ background: "transparent" }}>
-                    <input type="checkbox" checked={todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))} onChange={() => alternarPessoa(nome)} style={{ accentColor: corPrincipal, minHeight: 16, width: 16, height: 16 }} />{nome}
-                  </label>)}
-                </div>
-                {!nomesUnicos.length && <p className="text-xs" style={{ color: COR.tintaSuave }}>Nenhuma pessoa cadastrada neste cartão.</p>}
-                <button type="button" onClick={() => { setMenuPessoasAberto(false); botaoFiltroRef.current?.focus(); }} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: corPrincipal }}>Concluir</button>
-              </div>}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-end">
-          <button
-            onClick={gerarRelatorioPdf}
-            disabled={linhasMes.length === 0 || gerandoImagem}
-            className="flex items-center gap-1.5 px-3 h-11 rounded-2xl text-sm font-semibold text-white disabled:opacity-40"
-            style={{ background: COR.ouroClaro, color: COR.ouro }}
-            title={pessoaFiltro === "todos" ? "Gera uma imagem do relatório do mês selecionado" : `Gera uma imagem do relatório de ${pessoaFiltro} no mês selecionado`}
-          >
-            <FileDown size={15} /> {gerandoImagem ? "Gerando..." : "Gerar imagem"}
-          </button>
-        </div>
-      </div>
-
-      <button type="button" onClick={() => setMostrarResumoPessoas(true)} className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}><User size={18} />Resumo por pessoa</button>
-
+      {ativo && ferramentasHabilitadas && !mostrarVoz && !mostrarResumoPessoas && !ferramenta && createPortal(<button type="button" aria-label="Abrir ferramentas do cartão" title="Ferramentas do cartão" onClick={() => setFerramenta("menu")} className="fixed z-40 rounded-full flex items-center justify-center oculta-impressao" style={{ width: 56, height: 56, right: "max(20px, calc((100vw - 672px) / 2 + 20px))", bottom: "calc(100px + env(safe-area-inset-bottom, 0px))", background: COR.ouro, color: "white", boxShadow: "0 6px 18px rgba(37,99,235,0.3)" }}><Plus size={28} /></button>, document.body)}
+      {ferramenta === "menu" && <JanelaFerramentaCartao titulo="Ferramentas do cartão" onFechar={() => setFerramenta(null)} flutuante>
+        <div className="flex flex-col gap-1">{[
+          { nome: "Adicionar compra", Icon: Plus, acao: () => { setMesCompra(mesSelecionado); setMostrarForm(true); setFerramenta("adicionar"); } },
+          { nome: "Adicionar por voz", Icon: Mic, acao: () => { setFerramenta(null); setMostrarVoz(true); } },
+          { nome: "Filtrar por pessoa", Icon: User, detalhe: resumoFiltro, acao: () => setFerramenta("filtrar") },
+          { nome: gerandoImagem ? "Gerando imagem..." : "Gerar imagem", Icon: FileDown, desabilitado: gerandoImagem || !linhasMes.length, acao: () => { setFerramenta(null); gerarRelatorioPdf(); } },
+          { nome: "Resumo por pessoa", Icon: User, acao: () => { setFerramenta(null); setMostrarResumoPessoas(true); } },
+          { nome: "Buscar compra ou pessoa", Icon: Search, detalhe: buscaCompra, acao: () => setFerramenta("buscar") },
+          { nome: "Calculadora", Icon: IconeCalculadora, acao: () => { setFerramenta(null); onAbrirCalculadora(); } },
+        ].map(({ nome, Icon, detalhe, acao, desabilitado }) => <button key={nome} type="button" disabled={desabilitado} onClick={acao} className="flex items-center gap-3 w-full text-left rounded-xl px-3 py-3 text-sm disabled:opacity-40" style={{ color: COR.tinta }}><Icon size={20} color={COR.ouro} /><span className="min-w-0 flex-1">{nome}{detalhe && <span className="block text-xs truncate mt-0.5" style={{ color: COR.tintaSuave }}>{detalhe}</span>}</span><ChevronRight size={16} color={COR.tintaSuave} /></button>)}</div>
+      </JanelaFerramentaCartao>}
+      {ferramenta === "filtrar" && <JanelaFerramentaCartao titulo="Filtrar por pessoa" onFechar={() => setFerramenta(null)}>
+        <div className="flex gap-2 mb-3"><button onClick={() => setPessoasSelecionadas(null)} className="rounded-xl px-3 py-2 text-sm" style={{ background: COR.ouroClaro, color: COR.ouro }}>Todas</button><button onClick={() => setPessoasSelecionadas([])} className="rounded-xl px-3 py-2 text-sm" style={{ background: COR.papelEscuro }}>Limpar seleção</button></div>
+        <div className="flex flex-col max-h-72 overflow-y-auto">{nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-3 py-3 text-sm cursor-pointer"><input type="checkbox" checked={todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))} onChange={() => alternarPessoa(nome)} style={{ accentColor: corPrincipal, minHeight: 16, width: 16, height: 16 }} />{nome}</label>)}</div>
+        {!nomesUnicos.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhuma pessoa cadastrada neste cartão.</p>}
+        <button onClick={() => setFerramenta(null)} className="w-full rounded-xl py-3 text-sm font-semibold text-white mt-3" style={{ background: COR.ouro }}>Concluir</button>
+      </JanelaFerramentaCartao>}
+      {ferramenta === "buscar" && <JanelaFerramentaCartao titulo="Buscar compra ou pessoa" onFechar={() => setFerramenta(null)}>
       <div className="flex items-center gap-2 rounded-2xl border px-3 bg-white oculta-impressao" style={{ borderColor: COR.linha }}><Search size={18} color={COR.tintaSuave} /><input aria-label="Buscar compras" placeholder="Buscar compra ou pessoa" value={buscaCompra} onChange={(e) => setBuscaCompra(e.target.value)} className="busca-compras flex-1 min-w-0 py-3 text-sm outline-none" />{buscaCompra && <button aria-label="Limpar busca" onClick={() => setBuscaCompra("")} className="p-2"><X size={16} /></button>}</div>
-
+        <p className="text-xs mt-3" style={{ color: COR.tintaSuave }}>{linhasMes.length} {linhasMes.length === 1 ? "compra encontrada" : "compras encontradas"} no mês selecionado.</p>
+        <button onClick={() => setFerramenta(null)} className="w-full rounded-xl py-3 text-sm font-semibold text-white mt-4" style={{ background: COR.ouro }}>Ver resultados</button>
+      </JanelaFerramentaCartao>}
+      {mostrarVoz && <CompraPorVoz nomeUsuario={primeiroNomeUsuario} cartao={cartao} onFechar={() => setMostrarVoz(false)} onAdicionar={(registros, mes) => { onAtualizarCompras((atuais) => [...atuais, ...registros]); setPessoasSelecionadas(null); setBuscaCompra(""); setMesSelecionado(mes); }} onDesfazer={(ids) => onAtualizarCompras((atuais) => atuais.filter((c) => !ids.includes(c.id)))} />}
       {mostrarResumoPessoas && <ResumoPessoas cartao={cartao} mes={mesSelecionado} primeiroNomeUsuario={primeiroNomeUsuario} ocultarValores={ocultarValores} onFechar={() => setMostrarResumoPessoas(false)} onAtualizarRecebimentos={onAtualizarRecebimentos} onVerCompras={(nome) => { setPessoasSelecionadas([nome]); setBuscaCompra(""); setMostrarResumoPessoas(false); }} />}
-
-      {mostrarForm && (
-        <div className="rounded-2xl p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+      {ferramenta === "adicionar" && (
+        <JanelaFerramentaCartao titulo="Adicionar compra" onFechar={() => { setMostrarForm(false); setFerramenta(null); }}><div className="rounded-2xl p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           <Campo label="Nome de quem comprou">
             <input
               className={inputBase} style={{ borderColor: COR.linha }}
@@ -1973,14 +1944,14 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
           <OpcaoDividirCompra ativa={dividir} onAtiva={setDividir} pessoa={dividirCom} onPessoa={setDividirCom} nome={nova.nome} valor={nova.valor} negativo={valorNegativo || pagamentoAntecipado} cor={corPrincipal} />
           {erroNovaCompra && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroNovaCompra}</p>}
           <div className="flex gap-2 justify-end mt-1">
-            <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
+            <button onClick={() => { setMostrarForm(false); setFerramenta(null); }} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
               Cancelar
             </button>
             <button onClick={adicionar} className="px-3 py-1.5 text-sm font-semibold rounded-2xl text-white" style={{ background: corPrincipal }}>
               Salvar
             </button>
           </div>
-        </div>
+        </div></JanelaFerramentaCartao>
       )}
 
       {erroExclusao && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroExclusao}</p>}
@@ -2259,16 +2230,29 @@ function CompraPorVoz({ nomeUsuario, cartao, onFechar, onAdicionar, onDesfazer }
   return createPortal(<div role="dialog" aria-modal="true" aria-label="Compra por voz" className="fixed inset-0 z-[70] flex items-center justify-center p-4 oculta-impressao" style={{ background: "rgba(15,23,42,0.4)" }} onClick={fechar}>
     <div className="w-full max-w-md rounded-3xl p-5 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "85dvh" }} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Compra por voz</h2><button type="button" aria-label="Fechar compra por voz" onClick={fechar} className="p-2"><X size={22} /></button></div>
-      <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{cartao.nome} · Fatura atual: {rotuloDoMes(mesResumoInicial())}</p>
       <div className="flex justify-center my-5"><button type="button" aria-label={ouvindo ? "Cancelar gravação" : "Iniciar gravação"} disabled={!suportado || !!resultado} onClick={ouvindo ? cancelarAudio : iniciar} className="rounded-full flex items-center justify-center disabled:opacity-50" style={{ width: 76, height: 76, background: COR.ouro, color: "white", boxShadow: "0 0 0 10px #DBEAFE" }}><Mic size={32} /></button></div>
       <p role="status" aria-live="polite" className="text-sm text-center mb-3" style={{ color: resultado && !desfeita ? COR.verde : COR.tintaSuave }}>{desfeita ? "Compra desfeita." : resultado ? "Compra adicionada à fatura atual." : ouvindo ? "Ouvindo... fale a compra e aguarde." : "Toque no microfone para falar."}</p>
       {!suportado && <p className="text-sm mb-3" style={{ color: COR.vermelho }}>Seu navegador não oferece reconhecimento de voz. Tente abrir o app no Chrome ou use Adicionar compra.</p>}
-      {!resultado && <p className="text-xs rounded-xl p-3" style={{ background: COR.papel, color: COR.tintaSuave }}>Exemplo: “Comprei trinta reais no McDonald's hoje. Dividir compra com Filipe.” Compras reconhecidas são adicionadas automaticamente. Use frases com valor, compra e, se desejar, uma pessoa para dividir.</p>}
       {transcricao && <p className="text-sm rounded-xl p-3 mt-3" style={{ background: COR.papel }}>“{transcricao}”</p>}
       {erro && <p role="alert" className="text-sm mt-3" style={{ color: COR.vermelho }}>{erro} Nenhuma compra foi adicionada.</p>}
       {resultado && <div className="mt-4"><p className="text-sm font-semibold">{resultado.compra} · {fmt(resultado.valor)}</p><p className="text-xs mt-1 mb-2" style={{ color: COR.tintaSuave }}>Fatura: {rotuloDoMes(resultado.mes)}</p>{resultado.registros.map((c) => <div key={c.id} className="flex justify-between rounded-xl border px-3 py-2 mt-2 text-sm" style={{ borderColor: COR.linha }}><span>{c.nome}</span><span>{fmt(c.valor)}</span></div>)}{resultado.dividirCom && <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Divisão em partes iguais. Um centavo de diferença, quando necessário, fica na sua parte.</p>}</div>}
       <div className="flex justify-end gap-3 mt-5">{resultado && !desfeita && <button type="button" onClick={() => { onDesfazer(resultado.registros.map((c) => c.id)); setDesfeita(true); }} className="rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}>Desfazer</button>}<button type="button" onClick={fechar} className="rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ background: COR.ouro }}>{resultado ? "Concluir" : "Cancelar"}</button></div>
       {!resultado && <p className="text-xs mt-3" style={{ color: COR.tintaSuave }}>O navegador pode usar um serviço online para reconhecer sua voz.</p>}
+    </div>
+  </div>, document.body);
+}
+
+function JanelaFerramentaCartao({ titulo, onFechar, flutuante = false, children }) {
+  useEffect(() => {
+    const teclado = (e) => { if (e.key === "Escape") onFechar(); };
+    document.addEventListener("keydown", teclado);
+    const anterior = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", teclado); document.body.style.overflow = anterior; };
+  }, []);
+  return createPortal(<div role="dialog" aria-modal="true" aria-label={titulo} className="fixed inset-0 z-[60] flex items-center justify-center p-4 oculta-impressao" style={{ background: "rgba(15,23,42,0.25)" }} onClick={onFechar} onTouchStart={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()}>
+    <div className="rounded-3xl p-4 overflow-y-auto" style={{ background: COR.cartao, width: "min(440px, calc(100vw - 32px))", maxHeight: flutuante ? "calc(100dvh - 180px)" : "85dvh", ...(flutuante ? { position: "fixed", right: "max(20px, calc((100vw - 672px) / 2 + 20px))", bottom: "calc(100px + env(safe-area-inset-bottom, 0px))", width: "min(320px, calc(100vw - 40px))" } : {}), boxShadow: "0 12px 40px rgba(15,23,42,0.16)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between gap-3 mb-3"><h2 className="text-base font-bold">{titulo}</h2><button type="button" aria-label="Fechar ferramentas" onClick={onFechar} className="p-2 rounded-xl"><X size={20} /></button></div>
+      {children}
     </div>
   </div>, document.body);
 }
