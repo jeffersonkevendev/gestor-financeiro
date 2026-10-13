@@ -2036,7 +2036,7 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
                 <div className="px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-bold break-words">{dadosParcelamento(c).descricao}</p>
+                      <p className="text-sm font-normal break-words">{dadosParcelamento(c).descricao}</p>
                       {dadosParcelamento(c).parcelada && <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>Parcela {dadosParcelamento(c).numero}/{dadosParcelamento(c).total}</p>}
                       <div className="flex items-center gap-3 mt-2">
                         <button type="button" aria-label={`Editar ${dadosParcelamento(c).descricao}`} onClick={() => iniciarEdicao(c)} className="p-1" style={{ color: COR.tintaSuave }}><Pencil size={18} /></button>
@@ -2044,8 +2044,8 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2 max-w-[45%] text-right">
-                      <span className="fonte-mono text-base font-bold whitespace-nowrap">{valorVisivel(c.valor)}</span>
-                      <span className="text-xs font-semibold px-3 py-1 rounded-full break-words max-w-full" style={{ background: ehPessoaAutomatica(c.nome, pessoasAutomaticas) ? corClara : COR.papelEscuro, color: ehPessoaAutomatica(c.nome, pessoasAutomaticas) ? corPrincipal : COR.tintaSuave }}>{c.nome}</span>
+                      <span className="fonte-mono text-sm font-normal whitespace-nowrap">{valorVisivel(c.valor)}</span>
+                      <span className="text-xs font-normal px-3 py-1 rounded-full break-words max-w-full" style={{ background: ehPessoaAutomatica(c.nome, pessoasAutomaticas) ? corClara : COR.papelEscuro, color: ehPessoaAutomatica(c.nome, pessoasAutomaticas) ? corPrincipal : COR.tintaSuave }}>{c.nome}</span>
                     </div>
                   </div>
                 </div>
