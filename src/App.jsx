@@ -666,12 +666,13 @@ function MeuCaixaApp({ usuario }) {
         .fonte-display { font-family: 'Inter', ui-sans-serif, system-ui; font-weight: 700; letter-spacing: -0.025em; }
         .fonte-mono { font-family: 'Inter', ui-sans-serif, system-ui; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
         button { -webkit-tap-highlight-color: transparent; }
+        input.busca-compras:focus { outline: none !important; box-shadow: none !important; }
         button:focus-visible { outline: 3px solid #93C5FD; outline-offset: 3px; }
         input:not([type="checkbox"]):not([type="radio"]), select { background: white; min-height: 40px; }
         input[type="checkbox"], input[type="radio"] { min-height: 0; }
         input[type="checkbox"]:focus, input[type="radio"]:focus { outline: none; box-shadow: none; }
         input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid #93C5FD; outline-offset: 2px; }
-        input:not([type="checkbox"]):not([type="radio"]):focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
+        input:not([type="checkbox"]):not([type="radio"]):not(.busca-compras):focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
         .relatorio-impressao { position: fixed; top: 0; left: -10000px; width: 420px; background: white; }
       `}</style>
 
@@ -1817,6 +1818,24 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
 
   return (
     <div className="flex flex-col gap-6">
+      <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={corPrincipal} />
+
+      <div className="oculta-impressao">
+        {mesSelecionado === mesResumoInicial() && <h2 className="text-base font-bold mb-2" style={{ color: COR.ouro }}>Fatura Atual</h2>}
+        <div className="rounded-2xl px-5 py-4" style={{ background: corPrincipal }}>
+          <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
+          {dataVencimentoCartao(cartao, mesSelecionado) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: {dataVencimentoCartao(cartao, mesSelecionado).slice(-2)} de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
+        </div>
+      </div>
+
+      <button
+        onClick={() => setMostrarForm((v) => !v)}
+        className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-sm font-semibold border-2 border-dashed oculta-impressao"
+        style={{ borderColor: corPrincipal, color: corPrincipal }}
+      >
+        <Plus size={16} /> Adicionar compra
+      </button>
+
       <div className="flex gap-2 oculta-impressao">
         <div className="flex-1 min-w-0">
           <div className="flex flex-col gap-1 text-xs w-full">
@@ -1859,25 +1878,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
         </div>
       </div>
 
-      <div className="flex items-center gap-2 rounded-2xl border px-3 bg-white oculta-impressao" style={{ borderColor: COR.linha }}><Search size={18} color={COR.tintaSuave} /><input aria-label="Buscar compras" placeholder="Buscar compra ou pessoa" value={buscaCompra} onChange={(e) => setBuscaCompra(e.target.value)} className="flex-1 min-w-0 py-3 text-sm outline-none" />{buscaCompra && <button aria-label="Limpar busca" onClick={() => setBuscaCompra("")} className="p-2"><X size={16} /></button>}</div>
-
-      <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={corPrincipal} />
-
-      <div className="oculta-impressao">
-        {mesSelecionado === mesResumoInicial() && <h2 className="text-base font-bold mb-2" style={{ color: COR.ouro }}>Fatura Atual</h2>}
-        <div className="rounded-2xl px-5 py-4" style={{ background: corPrincipal }}>
-          <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
-          {dataVencimentoCartao(cartao, mesSelecionado) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: {dataVencimentoCartao(cartao, mesSelecionado).slice(-2)} de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
-        </div>
-      </div>
-
-      <button
-        onClick={() => setMostrarForm((v) => !v)}
-        className="flex items-center justify-center gap-2 rounded-2xl py-2.5 text-sm font-semibold border-2 border-dashed oculta-impressao"
-        style={{ borderColor: corPrincipal, color: corPrincipal }}
-      >
-        <Plus size={16} /> Adicionar compra
-      </button>
+      <div className="flex items-center gap-2 rounded-2xl border px-3 bg-white oculta-impressao" style={{ borderColor: COR.linha }}><Search size={18} color={COR.tintaSuave} /><input aria-label="Buscar compras" placeholder="Buscar compra ou pessoa" value={buscaCompra} onChange={(e) => setBuscaCompra(e.target.value)} className="busca-compras flex-1 min-w-0 py-3 text-sm outline-none" />{buscaCompra && <button aria-label="Limpar busca" onClick={() => setBuscaCompra("")} className="p-2"><X size={16} /></button>}</div>
 
       {mostrarForm && (
         <div className="rounded-2xl p-4 flex flex-col gap-3 oculta-impressao" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
