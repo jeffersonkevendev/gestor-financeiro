@@ -482,7 +482,7 @@ function MeuCaixaApp({ usuario }) {
   const [mostrarListaCartoes, setMostrarListaCartoes] = useState(false);
   const [cartaoOpcoesId, setCartaoOpcoesId] = useState(null);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
-  const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState(null);
+  const [cartaoSelecionadoId, setCartaoSelecionadoId] = useLocalStorageState(`meu-caixa:${usuario.uid}:cartao-selecionado`, null);
   const [mostrarNovaReceita, setMostrarNovaReceita] = useState(false);
   const [receitaEditando, setReceitaEditando] = useState(null);
   const [mostrarOrcamento, setMostrarOrcamento] = useState(false);
@@ -727,7 +727,7 @@ function MeuCaixaApp({ usuario }) {
               pessoasAutomaticas={pessoasAutomaticas}
               primeiroNome={primeiroNomeDoUsuario}
               pagamentosCartaoPagos={pagamentosCartaoPagos}
-              onIrPara={setAba}
+              onIrPara={(destino) => { const cartao = cartoes.find((c) => destino === `cartao-${c.id}`); if (cartao) setCartaoSelecionadoId(cartao.id); setAba(destino); }}
               onAbrirCalculadora={() => setMostrarCalculadora(true)}
             />
           </div>
@@ -771,7 +771,16 @@ function MeuCaixaApp({ usuario }) {
           {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
             { label: "Perfil", Icon: User, ativo: aba === "perfil", acao: () => setAba("perfil") },
-            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => { setCartaoOpcoesId(null); setMostrarAddCartao(false); setNomeNovoCartao(""); setMostrarListaCartoes(true); } },
+            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => {
+              const destino = cartoes.length === 1 ? cartoes[0] : cartoes.find((c) => String(c.id) === String(cartaoSelecionadoId));
+              setCartaoOpcoesId(null); setMostrarAddCartao(false); setNomeNovoCartao("");
+              if (destino && aba !== `cartao-${destino.id}`) {
+                setCartaoSelecionadoId(destino.id);
+                fecharPopupCartoes();
+                setArraste(0);
+                setAba(`cartao-${destino.id}`);
+              } else setMostrarListaCartoes(true);
+            } },
             { label: "Gráficos", Icon: BarChart3, ativo: aba === "graficos", acao: () => setAba("graficos") }
           ].map(({ label, Icon, ativo, acao }) => (
             <button key={label} aria-current={ativo ? "page" : undefined} onClick={acao} className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] sm:text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
@@ -810,7 +819,7 @@ function MeuCaixaApp({ usuario }) {
               <div className="flex flex-col gap-3">
                 {cartoes.map((c) => <div key={c.id} className="rounded-xl border overflow-hidden" style={{ borderColor: COR.linha }}>
                   <div className="flex items-center">
-                    <button type="button" aria-label={`Abrir ${c.nome}`} onClick={() => { setAba(`cartao-${c.id}`); fecharPopupCartoes(); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span></button>
+                    <button type="button" aria-label={`Abrir ${c.nome}`} onClick={() => { setCartaoSelecionadoId(c.id); setAba(`cartao-${c.id}`); fecharPopupCartoes(); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span></button>
                     <button type="button" aria-label={`Opções de ${c.nome}`} aria-expanded={cartaoOpcoesId === c.id} onClick={() => setCartaoOpcoesId((atual) => atual === c.id ? null : c.id)} className="p-4 shrink-0" style={{ color: COR.tintaSuave }}><ChevronRight size={20} style={{ transform: cartaoOpcoesId === c.id ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms" }} /></button>
                   </div>
                   {cartaoOpcoesId === c.id && <div className="flex flex-wrap justify-end gap-2 p-2" style={{ borderTop: `1px solid ${COR.linha}`, background: COR.papel }}>
