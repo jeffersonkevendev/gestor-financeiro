@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Settings2, Search, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
@@ -666,8 +667,11 @@ function MeuCaixaApp({ usuario }) {
         .fonte-mono { font-family: 'Inter', ui-sans-serif, system-ui; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
         button { -webkit-tap-highlight-color: transparent; }
         button:focus-visible { outline: 3px solid #93C5FD; outline-offset: 3px; }
-        input, select { background: white; min-height: 40px; }
-        input:focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
+        input:not([type="checkbox"]):not([type="radio"]), select { background: white; min-height: 40px; }
+        input[type="checkbox"], input[type="radio"] { min-height: 0; }
+        input[type="checkbox"]:focus, input[type="radio"]:focus { outline: none; box-shadow: none; }
+        input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid #93C5FD; outline-offset: 2px; }
+        input:not([type="checkbox"]):not([type="radio"]):focus, select:focus { border-color: ${acento} !important; box-shadow: 0 0 0 2px ${acentoClaro}; }
         .relatorio-impressao { position: fixed; top: 0; left: -10000px; width: 420px; background: white; }
       `}</style>
 
@@ -1201,6 +1205,7 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
   const [nova, setNova] = useState({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
+  const [confirmarAcao, setConfirmarAcao] = useState(null);
 
   const despesasPorMes = useMemo(() => {
     const grupos = {};
@@ -1287,7 +1292,7 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
     setMesSelecionado(chaveDoMes(novaDespesa.vencimento));
   };
 
-  const iniciarEdicao = (d) => { setEditandoId(d.id); setRascunho({ ...d, valor: formatarValorDigitado(String(Math.round(d.valor * 100))) }); };
+  const iniciarEdicao = (d) => { setConfirmarAcao(null); setEditandoId(d.id); setRascunho({ ...d, valor: formatarValorDigitado(String(Math.round(d.valor * 100))) }); };
 
   const salvarEdicao = () => {
     const valor = valorMascaradoParaNumero(rascunho.valor);
@@ -1302,7 +1307,7 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
     setMesSelecionado(chaveDoMes(rascunho.vencimento));
   };
 
-  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
+  const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); setConfirmarAcao(null); };
   const excluir = (id, proximas = false) => {
     const alvo = despesas.find((d) => d.id === id);
     if (!alvo) return;
@@ -1392,57 +1397,15 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
       {filtro !== "Todas" && !linhasVisiveis.length && !cartoesVisiveis.length && <p role="status" className="text-sm text-center py-5" style={{ color: COR.tintaSuave }}>Nenhuma conta {filtro === "Pagas" ? "paga" : "pendente"} neste mês.</p>}
       {(linhasVisiveis.length > 0 || cartoesVisiveis.length > 0) && (
         <div className="flex flex-col gap-4">
-          {linhasVisiveis.map((d, i) => (
-            <div key={d.id} className="rounded-2xl border overflow-hidden" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
-              {editandoId === d.id ? (
-                <div className="p-3 flex flex-col gap-2" style={{ background: COR.papelEscuro }}>
-                  <input
-                    className={inputBase} style={{ borderColor: COR.linha }}
-                    value={rascunho.descricao}
-                    onChange={(e) => setRascunho({ ...rascunho, descricao: e.target.value })}
-                  />
-                  <select className={inputBase} style={{ borderColor: COR.linha }} value={rascunho.categoria} onChange={(e) => setRascunho({ ...rascunho, categoria: e.target.value })}>
-                    {CATEGORIAS.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
-                  <input
-                    className={inputBase} style={{ borderColor: COR.linha }}
-                    type="text" inputMode="numeric"
-                    value={rascunho.valor}
-                    onChange={(e) => setRascunho({ ...rascunho, valor: formatarValorDigitado(e.target.value) })}
-                  />
-                  <input
-                    className={inputBase} style={{ borderColor: COR.linha }}
-                    type="date"
-                    value={rascunho.vencimento}
-                    onChange={(e) => setRascunho({ ...rascunho, vencimento: e.target.value })}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={cancelarEdicao} className="p-1.5 rounded-2xl" style={{ color: COR.tintaSuave }}><X size={16} /></button>
-                    <button onClick={salvarEdicao} className="p-1.5 rounded-2xl text-white" style={{ background: COR.ouro }}><Check size={16} /></button>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
-                    <button onClick={() => togglePaga(d.id)} className="mt-1 shrink-0 p-1" title={d.paga ? "Marcar como pendente" : "Marcar como paga"} aria-label={`${d.paga ? "Marcar como pendente" : "Marcar como paga"}: ${d.descricao}`}>
-                      {d.paga ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
-                    </button>
-                    <div className="min-w-0 flex-1 pt-1">
-                      <p className="text-base font-bold break-words" style={{ color: d.paga ? COR.tintaSuave : COR.tinta }}>{d.descricao}</p>
-                      <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</p>{d.recorrenciaGrupoId && <span className="inline-block rounded-full px-2 py-0.5 text-[10px] mt-1" style={{ background: COR.ouroClaro, color: COR.ouro }}>Mensal</span>}
-                    </div>
-                    <div className="flex flex-col items-end gap-2 pt-1 shrink-0">
-                      <span className="fonte-mono text-base font-bold" style={{ color: COR.tinta }}>{fmt(d.valor)}</span>
-                      <span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: statusDespesa(d).fundo, color: statusDespesa(d).cor }}>{statusDespesa(d).texto}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-end items-center gap-4 mt-5">
-                    <button onClick={() => iniciarEdicao(d)} className="p-1" aria-label={`Editar ${d.descricao}`} style={{ color: COR.tintaSuave }}><Pencil size={19} /></button>
-                    <BotaoExcluirConfirmar tamanho={19} onConfirmar={() => excluir(d.id)} />
-                    {d.recorrenciaGrupoId && <BotaoExcluirConfirmar descricao="Excluir esta e próximas repetições" texto="Parar repetições" aviso="Esta e próximas" onConfirmar={() => excluir(d.id, true)} />}
-                  </div>
-                </div>
-              )}
+          {linhasVisiveis.map((d) => (
+            <div key={d.id} className="rounded-2xl border p-4 flex items-start gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+              <button onClick={() => togglePaga(d.id)} className="mt-1 shrink-0 p-1" title={d.paga ? "Marcar como pendente" : "Marcar como paga"} aria-label={`${d.paga ? "Marcar como pendente" : "Marcar como paga"}: ${d.descricao}`}>
+                {d.paga ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
+              </button>
+              <button type="button" onClick={() => iniciarEdicao(d)} aria-label={`Editar ${d.descricao}`} className="flex-1 min-w-0 flex items-start gap-3 text-left pt-1">
+                <span className="min-w-0 flex-1"><span className="block text-base font-bold break-words" style={{ color: d.paga ? COR.tintaSuave : COR.tinta }}>{d.descricao}</span><span className="block text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</span>{d.recorrenciaGrupoId && <span className="inline-block rounded-full px-2 py-0.5 text-[10px] mt-1" style={{ background: COR.ouroClaro, color: COR.ouro }}>Mensal</span>}</span>
+                <span className="flex flex-col items-end gap-2 shrink-0"><span className="fonte-mono text-base font-bold" style={{ color: COR.tinta }}>{fmt(d.valor)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: statusDespesa(d).fundo, color: statusDespesa(d).cor }}>{statusDespesa(d).texto}</span></span>
+              </button>
             </div>
           ))}
 
@@ -1458,6 +1421,35 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
             </div>
           ))}
         </div>
+      )}
+
+      {editandoId && rascunho && createPortal(
+        <div role="dialog" aria-modal="true" aria-label="Editar despesa" className="fixed inset-0 z-50 flex items-center justify-center p-5 oculta-impressao" style={{ background: "rgba(15,23,42,0.4)", fontFamily: "'Inter', ui-sans-serif, system-ui", color: COR.tinta }} onClick={cancelarEdicao} onKeyDown={(e) => { if (e.key === "Escape") cancelarEdicao(); }}>
+          <div className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-4 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "85vh" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Editar despesa</h2><button type="button" aria-label="Fechar edição" onClick={cancelarEdicao} className="p-2"><X size={20} /></button></div>
+            <Campo label="Nome da despesa"><input autoFocus value={rascunho.descricao} onChange={(e) => setRascunho({ ...rascunho, descricao: e.target.value })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
+            <Campo label="Valor (R$)"><input inputMode="numeric" value={rascunho.valor} onChange={(e) => setRascunho({ ...rascunho, valor: formatarValorDigitado(e.target.value) })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
+            <Campo label="Vencimento"><input type="date" value={rascunho.vencimento} onChange={(e) => setRascunho({ ...rascunho, vencimento: e.target.value })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
+            <Campo label="Categoria"><select value={rascunho.categoria} onChange={(e) => setRascunho({ ...rascunho, categoria: e.target.value })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }}>{CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}</select></Campo>
+            {rascunho.recorrenciaGrupoId && <button type="button" onClick={() => setConfirmarAcao("parar")} className="text-sm font-semibold p-3 rounded-xl text-left" style={{ background: COR.papelEscuro, color: COR.vermelho }}>Parar repetições</button>}
+            <button type="button" onClick={() => setConfirmarAcao("excluir")} className="flex items-center gap-2 text-sm font-semibold" style={{ color: COR.vermelho }}><Trash2 size={18} />Excluir despesa</button>
+            {confirmarAcao && <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "#FEF2F2" }}>
+              <p className="text-sm">{confirmarAcao === "parar" ? "Parar as próximas repetições? Esta despesa será mantida." : "Excluir esta despesa?"}</p>
+              <div className="flex gap-3 justify-end"><button type="button" onClick={() => setConfirmarAcao(null)} className="text-sm p-2">Voltar</button><button type="button" onClick={() => {
+                if (confirmarAcao === "excluir") excluir(editandoId);
+                else {
+                  const original = despesas.find((d) => d.id === editandoId);
+                  const futuras = despesas.filter((d) => d.recorrenciaGrupoId === original.recorrenciaGrupoId && d.vencimento > original.vencimento);
+                  const ids = new Set(futuras.map((d) => d.id));
+                  if (futuras.length) onRegistrarExclusao?.(futuras);
+                  onAtualizarDespesas(despesas.filter((d) => !ids.has(d.id)));
+                }
+                cancelarEdicao();
+              }} className="text-sm font-semibold p-2" style={{ color: COR.vermelho }}>Confirmar</button></div>
+            </div>}
+            <div className="flex justify-end gap-2"><button type="button" onClick={cancelarEdicao} className="text-sm font-semibold px-4 py-3" style={{ color: COR.tintaSuave }}>Cancelar</button><button type="button" disabled={!rascunho.descricao.trim() || !rascunho.vencimento || !(valorMascaradoParaNumero(rascunho.valor) > 0)} onClick={salvarEdicao} className="text-sm font-semibold rounded-xl px-4 py-3 text-white disabled:opacity-40" style={{ background: COR.ouro }}>Salvar</button></div>
+          </div>
+        </div>, document.body
       )}
 
       {dadosGrafico.length > 0 && (
@@ -1526,19 +1518,20 @@ function editarCompraComParcelas(compras, id, rascunho) {
       }
     }
   }
-  const valor = rascunho.negativo ? -magnitude : magnitude;
+  const valor = rascunho.negativo || rascunho.antecipado ? -magnitude : magnitude;
+  const tipoLancamento = rascunho.antecipado ? "pagamento_antecipado" : rascunho.negativo ? "estorno" : "compra";
   const nome = rascunho.nome.trim(), descricao = rascunho.compra.trim();
   let novos;
   if (rascunho.parcelada) {
     const grupoId = original.parcelaGrupoId || uid();
     novos = Array.from({ length: total - inicio + 1 }, (_, i) => ({
       id: i === 0 ? id : uid(), nome, compra: `${descricao} (parcela ${inicio + i}/${total})`,
-      valor, data: deslocarMesCompra(rascunho.mes, i), parcelaGrupoId: grupoId,
+      valor, tipoLancamento, data: deslocarMesCompra(rascunho.mes, i), parcelaGrupoId: grupoId,
       compraBase: descricao, parcelaNumero: inicio + i, totalParcelas: total,
     }));
   } else {
     const { parcelaGrupoId, compraBase, parcelaNumero, totalParcelas, ...resto } = original;
-    novos = [{ ...resto, nome, compra: descricao, valor, data: `${rascunho.mes}-01` }];
+    novos = [{ ...resto, nome, compra: descricao, valor, tipoLancamento, data: `${rascunho.mes}-01` }];
   }
   const mantidas = compras.filter((c) => !substituir.has(c.id)).map((c) => {
     // Vincula também as parcelas antigas anteriores, para futuras edições reconhecerem a série.
@@ -1686,6 +1679,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nova, setNova] = useState({ nome: "", compra: "", valor: "", data: "" });
   const [valorNegativo, setValorNegativo] = useState(false);
+  const [pagamentoAntecipado, setPagamentoAntecipado] = useState(false);
   const [dividir, setDividir] = useState(false);
   const [dividirCom, setDividirCom] = useState("");
   const [erroNovaCompra, setErroNovaCompra] = useState("");
@@ -1740,7 +1734,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
     setErroNovaCompra("");
     const magnitude = valorMascaradoParaNumero(nova.valor);
     if (!nova.nome.trim() || !nova.compra.trim() || !(magnitude > 0) || !mesCompra) return;
-    const valor = valorNegativo ? -magnitude : magnitude;
+    const valor = valorNegativo || pagamentoAntecipado ? -magnitude : magnitude;
 
     const [anoBase, mesBase] = mesCompra.split("-").map(Number);
 
@@ -1769,6 +1763,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       novosRegistros = [{ id: uid(), nome: nova.nome.trim(), compra: nova.compra.trim(), valor, data: `${mesCompra}-01` }];
     }
 
+    novosRegistros = novosRegistros.map((c) => ({ ...c, tipoLancamento: pagamentoAntecipado ? "pagamento_antecipado" : valorNegativo ? "estorno" : "compra" }));
     if (dividir) {
       try { novosRegistros = dividirRegistrosCompras(novosRegistros, nova.nome, dividirCom); }
       catch (erro) { setErroNovaCompra(erro.message); return; }
@@ -1778,6 +1773,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
     setDividirCom("");
     setNova({ nome: "", compra: "", valor: "", data: "" });
     setValorNegativo(false);
+    setPagamentoAntecipado(false);
     setParcelada(false);
     setParcelaAtual("1");
     setTotalParcelas("");
@@ -1789,7 +1785,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
     const info = dadosParcelamento(c);
     setErroEdicao("");
     setEditandoId(c.id);
-    setRascunho({ ...c, nome: c.nomePrincipal || c.nome, dividir: !!c.compartilhamentoId, dividirCom: c.nomeDivisao || "", compra: info.descricao, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valorCompartilhado ?? c.valor) * 100))), negativo: c.valor < 0, mes: chaveDoMes(c.data), parcelada: info.parcelada, parcelaAtual: String(info.numero), totalParcelas: info.parcelada ? String(info.total) : "" });
+    setRascunho({ ...c, nome: c.nomePrincipal || c.nome, dividir: !!c.compartilhamentoId, dividirCom: c.nomeDivisao || "", compra: info.descricao, valor: formatarValorDigitado(String(Math.round(Math.abs(c.valorCompartilhado ?? c.valor) * 100))), negativo: c.valor < 0 && c.tipoLancamento !== "pagamento_antecipado", antecipado: c.tipoLancamento === "pagamento_antecipado", mes: chaveDoMes(c.data), parcelada: info.parcelada, parcelaAtual: String(info.numero), totalParcelas: info.parcelada ? String(info.total) : "" });
   };
 
   const salvarEdicao = () => {
@@ -1922,12 +1918,13 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
             <input
               type="checkbox"
               checked={valorNegativo}
-              onChange={(e) => setValorNegativo(e.target.checked)}
+              onChange={(e) => { setValorNegativo(e.target.checked); if (e.target.checked) setPagamentoAntecipado(false); }}
               className="w-4 h-4"
               style={{ accentColor: corPrincipal }}
             />
             Estorno
           </label>
+          <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}><input type="checkbox" checked={pagamentoAntecipado} onChange={(e) => { setPagamentoAntecipado(e.target.checked); if (e.target.checked) setValorNegativo(false); }} className="w-4 h-4" style={{ accentColor: corPrincipal }} />Pagamento antecipado</label>
 
           <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
             <input
@@ -1964,7 +1961,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
             </>
           )}
 
-          <OpcaoDividirCompra ativa={dividir} onAtiva={setDividir} pessoa={dividirCom} onPessoa={setDividirCom} nome={nova.nome} valor={nova.valor} negativo={valorNegativo} cor={corPrincipal} />
+          <OpcaoDividirCompra ativa={dividir} onAtiva={setDividir} pessoa={dividirCom} onPessoa={setDividirCom} nome={nova.nome} valor={nova.valor} negativo={valorNegativo || pagamentoAntecipado} cor={corPrincipal} />
           {erroNovaCompra && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroNovaCompra}</p>}
           <div className="flex gap-2 justify-end mt-1">
             <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
@@ -2016,12 +2013,13 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     <input
                       type="checkbox"
                       checked={!!rascunho.negativo}
-                      onChange={(e) => setRascunho({ ...rascunho, negativo: e.target.checked })}
+                      onChange={(e) => setRascunho({ ...rascunho, negativo: e.target.checked, antecipado: e.target.checked ? false : rascunho.antecipado })}
                       className="w-4 h-4"
                       style={{ accentColor: corPrincipal }}
                     />
                     Estorno
                   </label>
+                  <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}><input type="checkbox" checked={!!rascunho.antecipado} onChange={(e) => setRascunho({ ...rascunho, antecipado: e.target.checked, negativo: e.target.checked ? false : rascunho.negativo })} className="w-4 h-4" style={{ accentColor: corPrincipal }} />Pagamento antecipado</label>
                   <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}>
                     <input type="checkbox" checked={!!rascunho.parcelada} onChange={(e) => setRascunho({ ...rascunho, parcelada: e.target.checked })} className="w-4 h-4" style={{ accentColor: corPrincipal }} />
                     Compra parcelada
@@ -2032,7 +2030,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     <p className="text-xs" style={{ color: COR.tintaSuave }}>O valor informado é o de cada parcela. Ao salvar, esta e as próximas parcelas serão atualizadas, uma por mês. As anteriores serão mantidas.</p>
                   </>}
                   {!rascunho.parcelada && dadosParcelamento(c).parcelada && <p className="text-xs" style={{ color: COR.tintaSuave }}>Ao salvar sem parcelamento, esta compra terá apenas um lançamento. As próximas parcelas serão removidas; as anteriores serão mantidas.</p>}
-                  <OpcaoDividirCompra ativa={rascunho.dividir} onAtiva={(v) => setRascunho({ ...rascunho, dividir: v })} pessoa={rascunho.dividirCom} onPessoa={(v) => setRascunho({ ...rascunho, dividirCom: v })} nome={rascunho.nome} valor={rascunho.valor} negativo={rascunho.negativo} cor={corPrincipal} />
+                  <OpcaoDividirCompra ativa={rascunho.dividir} onAtiva={(v) => setRascunho({ ...rascunho, dividir: v })} pessoa={rascunho.dividirCom} onPessoa={(v) => setRascunho({ ...rascunho, dividirCom: v })} nome={rascunho.nome} valor={rascunho.valor} negativo={rascunho.negativo || rascunho.antecipado} cor={corPrincipal} />
                   {c.compartilhamentoId && <p className="text-xs" style={{ color: COR.tintaSuave }}>Esta edição atualiza as duas partes da compra. Ao desmarcar a divisão, o valor total ficará para quem comprou.</p>}
                   {erroEdicao && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroEdicao}</p>}
                   <div className="flex gap-2 justify-end">
