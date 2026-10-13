@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
-  Settings2, Search, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  Settings2, Search, Mic, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -751,7 +751,7 @@ function MeuCaixaApp({ usuario }) {
               <CartaoTab
                 cartao={cartao}
                 onAtualizarCompras={(novasCompras) =>
-                  setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
+                  setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: typeof novasCompras === "function" ? novasCompras(c.compras || []) : novasCompras } : c)))
                 }
                 onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "compra", cartaoId: cartao.id, itens, label: itens.length > 1 ? "Compra e parcelas excluídas" : "Compra excluída" })}
                 primeiroNomeUsuario={primeiroNomeDoUsuario}
@@ -1692,6 +1692,7 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
   const [erroExclusao, setErroExclusao] = useState("");
   const [buscaCompra, setBuscaCompra] = useState("");
   const [mostrarResumoPessoas, setMostrarResumoPessoas] = useState(false);
+  const [mostrarVoz, setMostrarVoz] = useState(false);
 
   const nomesUnicos = useMemo(() => {
     const nomes = new Map();
@@ -1822,6 +1823,7 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
       <div className="oculta-impressao">
         {mesSelecionado === mesResumoInicial() && <h2 className="text-base font-bold mb-2" style={{ color: COR.ouro }}>Fatura Atual</h2>}
         <div className="rounded-2xl px-5 py-4" style={{ background: corPrincipal }}>
+          {identificarBancoCartao(cartao) === "nubank" && <MarcaNubankFatura />}
           <div className="flex items-center justify-between gap-3"><p className="fonte-mono text-3xl font-bold text-white">{valorVisivel(totalMes)}</p><BotaoPrivacidade oculto={ocultarValores} onClick={() => setOcultarValores((v) => !v)} cor="#FFFFFF" /></div>
           {dataVencimentoCartao(cartao, mesSelecionado) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: {dataVencimentoCartao(cartao, mesSelecionado).slice(-2)} de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
         </div>
@@ -1834,6 +1836,9 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
       >
         <Plus size={16} /> Adicionar compra
       </button>
+
+      <button type="button" onClick={() => setMostrarVoz(true)} className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold oculta-impressao" style={{ background: COR.ouroClaro, color: COR.ouro }}><Mic size={18} />Adicionar por voz</button>
+      {mostrarVoz && <CompraPorVoz nomeUsuario={primeiroNomeUsuario} cartao={cartao} onFechar={() => setMostrarVoz(false)} onAdicionar={(registros, mes) => { onAtualizarCompras((atuais) => [...atuais, ...registros]); setPessoasSelecionadas(null); setBuscaCompra(""); setMesSelecionado(mes); }} onDesfazer={(ids) => onAtualizarCompras((atuais) => atuais.filter((c) => !ids.includes(c.id)))} />}
 
       <div className="flex gap-2 oculta-impressao">
         <div className="flex-1 min-w-0">
@@ -2162,6 +2167,108 @@ function ResumoPessoas({ cartao, mes, primeiroNomeUsuario, ocultarValores, onFec
       {!pessoas.length && <p className="text-sm py-5" style={{ color: COR.tintaSuave }}>Nenhuma compra neste mês.</p>}
       <div className="grid grid-cols-2 gap-3 rounded-2xl border p-4 mt-4" style={{ background: COR.cartao, borderColor: COR.linha }}><div><p className="text-xs" style={{ color: COR.tintaSuave }}>A receber</p><p className="font-bold mt-1" style={{ color: "#92400E" }}>{valor(pendente)}</p></div><div><p className="text-xs" style={{ color: COR.tintaSuave }}>Recebido</p><p className="font-bold mt-1" style={{ color: COR.verde }}>{valor(recebido)}</p></div></div>
       <p className="text-xs mt-3" style={{ color: COR.tintaSuave }}>Os totais incluem sua parte. Marcar como recebido não altera o pagamento da fatura. Se o total da pessoa mudar, o recebimento deverá ser confirmado novamente.</p>
+    </div>
+  </div>, document.body);
+}
+
+function MarcaNubankFatura() { return <div className="text-white mb-3" aria-label="Nubank">        <svg aria-hidden="true" focusable="false" width="44" height="26" viewBox="0 0 44 24" fill="none">
+          <path d="M0.0243654 9.87682C-0.0304567 10.9469 0.0243654 12.042 0.0243654 13.1171V23.4431H5.83551V13.9822C5.83551 11.0319 5.81557 8.41669 5.83551 7.88164C5.94515 5.33141 6.64289 3.65626 7.95364 2.29613C7.85894 2.29613 7.7493 2.28613 7.65461 2.28613C4.82379 2.28613 2.16741 3.90628 0.8766 6.40651C0.293492 7.51161 0.0891551 8.69171 0.0243654 9.88182V9.87682Z" fill="currentColor" />
+          <path d="M13.3499 0C11.177 0 9.323 0.845077 7.9375 2.29521C12.2635 2.29521 15.0743 5.23547 15.2239 9.9109C15.2538 10.981 15.2687 16.7315 15.2687 16.7315V23.4471H21.0799V14.3763C21.0799 11.6311 21.0998 9.26084 20.9054 7.62069C20.3771 3.06028 17.5712 0.00500045 13.3499 0.00500045V0Z" fill="currentColor" />
+          <path d="M43.9757 14.1248C44.0305 13.0547 43.9757 11.9596 43.9757 10.8845V0.558594H38.1645V10.0195C38.1645 12.9697 38.1844 15.585 38.1645 16.12C38.0549 18.6702 37.3571 20.3454 36.0464 21.7055C36.1411 21.7055 36.2507 21.7155 36.3454 21.7155C39.1762 21.7155 41.8326 20.0954 43.1234 17.5951C43.7065 16.49 43.9109 15.3199 43.9757 14.1198V14.1248Z" fill="currentColor" />
+          <path d="M30.6536 24.0007C32.8265 24.0007 34.6805 23.1556 36.066 21.7055C31.74 21.7055 28.9291 18.7652 28.7796 14.0898C28.7497 13.0197 28.7248 10.3595 28.7248 7.2692V0.558594L22.9137 0.568595V9.63942C22.9137 12.3847 22.8937 14.7549 23.0881 16.395C23.6264 20.9554 26.4372 24.0007 30.6536 24.0007Z" fill="currentColor" />
+        </svg><span className="block text-xs mt-1">Nubank</span></div>; }
+
+function numeroFaladoPt(texto) {
+  const palavras = normalizarBusca(texto).trim();
+  if (/^\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?$/.test(palavras)) return Number(palavras.replace(/\./g, "").replace(",", "."));
+  if (/^\d+(?:\.\d{1,2})?$/.test(palavras)) return Number(palavras);
+  const valores = { zero:0, um:1, uma:1, dois:2, duas:2, tres:3, quatro:4, cinco:5, seis:6, sete:7, oito:8, nove:9, dez:10, onze:11, doze:12, treze:13, catorze:14, quatorze:14, quinze:15, dezesseis:16, dezessete:17, dezoito:18, dezenove:19, vinte:20, trinta:30, quarenta:40, cinquenta:50, sessenta:60, setenta:70, oitenta:80, noventa:90, cem:100, cento:100, duzentos:200, trezentos:300, quatrocentos:400, quinhentos:500, seiscentos:600, setecentos:700, oitocentos:800, novecentos:900 };
+  let total = 0, parcial = 0;
+  for (const palavra of palavras.split(/\s+/).filter((p) => p !== "e")) {
+    if (palavra === "mil") { total += (parcial || 1) * 1000; parcial = 0; }
+    else if (Object.hasOwn(valores, palavra)) parcial += valores[palavra];
+    else return NaN;
+  }
+  return total + parcial;
+}
+
+function interpretarCompraPorVoz(texto, nomeUsuario, mes = mesResumoInicial()) {
+  const nome = (nomeUsuario || "").trim();
+  if (!nome) throw new Error("Não foi possível identificar seu nome. Use o formulário de compra.");
+  const original = texto.trim();
+  if (/parcelad|parcelas|estorno|pagamento antecipado/i.test(normalizarBusca(original))) throw new Error("Nesta versão, use a voz para compras à vista. Para parcelas ou estornos, use Adicionar compra.");
+  let fala = original.replace(/[.!?]+\s*$/g, "");
+  const divisao = fala.match(/\bdivid(?:ir|a|ida|indo)\s+(?:a\s+)?(?:compra\s+)?com\s+(.+)$/i);
+  let dividirCom = "";
+  if (divisao) { dividirCom = divisao[1].trim(); fala = fala.slice(0, divisao.index).trim().replace(/[.!?,;]+$/, ""); }
+  if (/\bdivid/i.test(fala) || (dividirCom && /\s+e\s+|[,;]/i.test(dividirCom))) throw new Error("Diga o nome de uma pessoa para dividir, por exemplo: dividir compra com Filipe.");
+  const partes = fala.match(/^(?:comprei|gastei|paguei|compra de)\s+(.*?)\s+(?:no|na|em|para|de)\s+(.+)$/i);
+  if (!partes) throw new Error("Diga: comprei 30 reais no McDonald's hoje. Dividir compra com Filipe.");
+  const dinheiro = normalizarBusca(partes[1]).replace(/^r\$\s*/, "").trim();
+  let valor;
+  const moedas = dinheiro.match(/^(.*?)\s+reai?s?(?:\s+e\s+(.*?)\s+centavos?)?$/);
+  if (moedas) { const inteiro = numeroFaladoPt(moedas[1]), centavos = moedas[2] ? numeroFaladoPt(moedas[2]) : 0; valor = inteiro + centavos / 100; if (centavos < 0 || centavos > 99) valor = NaN; }
+  else valor = numeroFaladoPt(dinheiro);
+  if (!(valor > 0) || !Number.isFinite(valor) || valor > 999999) throw new Error("Não entendi o valor. Diga, por exemplo, trinta reais ou trinta reais e cinquenta centavos.");
+  let compra = partes[2].replace(/(?:[,;.]?\s+)?(?:hoje|ontem)\s*[.!?]*$/i, "").trim().replace(/[.!?]+$/, "");
+  if (!compra || /\bamanha\b|\bdia\s+\d/i.test(normalizarBusca(compra))) throw new Error("Não entendi o nome da compra. Tente: comprei 30 reais no supermercado hoje.");
+  const registro = { id: uid(), nome, compra, valor: Math.round(valor * 100) / 100, data: `${mes}-01`, tipoLancamento: "compra", origem: "voz", transcricaoVoz: original };
+  const registros = dividirCom ? dividirRegistrosCompras([registro], nome, dividirCom) : [registro];
+  return { compra, valor: registro.valor, mes, dividirCom, registros };
+}
+
+function CompraPorVoz({ nomeUsuario, cartao, onFechar, onAdicionar, onDesfazer }) {
+  const [ouvindo, setOuvindo] = useState(false), [erro, setErro] = useState(""), [transcricao, setTranscricao] = useState(""), [resultado, setResultado] = useState(null), [desfeita, setDesfeita] = useState(false);
+  const reconhecimentoRef = useRef(null), canceladoRef = useRef(false), processadoRef = useRef(false), callbacksRef = useRef({ onAdicionar });
+  callbacksRef.current = { onAdicionar };
+  const suportado = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const cancelarAudio = () => { canceladoRef.current = true; reconhecimentoRef.current?.abort(); setOuvindo(false); };
+  useEffect(() => {
+    const fechar = (e) => { if (e.key === "Escape") { cancelarAudio(); onFechar(); } };
+    document.addEventListener("keydown", fechar);
+    return () => { canceladoRef.current = true; reconhecimentoRef.current?.abort(); document.removeEventListener("keydown", fechar); };
+  }, []);
+  const fechar = () => { cancelarAudio(); onFechar(); };
+  const iniciar = () => {
+    if (!suportado || ouvindo || resultado) return;
+    canceladoRef.current = false; processadoRef.current = false; setErro(""); setTranscricao("");
+    const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const reconhecimento = new Reconhecimento(); reconhecimentoRef.current = reconhecimento;
+    reconhecimento.lang = "pt-BR"; reconhecimento.continuous = false; reconhecimento.interimResults = false; reconhecimento.maxAlternatives = 1;
+    reconhecimento.onstart = () => { if (!canceladoRef.current) setOuvindo(true); };
+    reconhecimento.onresult = (evento) => {
+      if (canceladoRef.current || processadoRef.current) return;
+      processadoRef.current = true;
+      const texto = Array.from(evento.results).filter((r) => r.isFinal).map((r) => r[0].transcript).join(" ").trim();
+      setTranscricao(texto);
+      try {
+        const interpretado = interpretarCompraPorVoz(texto, nomeUsuario);
+        callbacksRef.current.onAdicionar(interpretado.registros, interpretado.mes);
+        setResultado(interpretado);
+      } catch (e) { setErro(e.message); }
+      setOuvindo(false);
+    };
+    reconhecimento.onerror = (evento) => {
+      if (canceladoRef.current) return;
+      const mensagens = { "not-allowed": "Permita o microfone nas configurações do navegador para usar a voz.", "service-not-allowed": "O reconhecimento de voz não está disponível neste navegador. Tente no Chrome.", "no-speech": "Não ouvi sua fala. Toque no microfone e tente novamente.", "audio-capture": "Não foi possível acessar o microfone.", network: "Confira sua conexão com a internet e tente novamente." };
+      setErro(mensagens[evento.error] || "Não foi possível reconhecer a fala. Tente novamente."); setOuvindo(false);
+    };
+    reconhecimento.onend = () => { if (!canceladoRef.current) setOuvindo(false); };
+    try { setOuvindo(true); reconhecimento.start(); } catch { setOuvindo(false); setErro("Não foi possível iniciar o microfone. Tente novamente."); }
+  };
+  return createPortal(<div role="dialog" aria-modal="true" aria-label="Compra por voz" className="fixed inset-0 z-[70] flex items-center justify-center p-4 oculta-impressao" style={{ background: "rgba(15,23,42,0.4)" }} onClick={fechar}>
+    <div className="w-full max-w-md rounded-3xl p-5 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "85dvh" }} onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Compra por voz</h2><button type="button" aria-label="Fechar compra por voz" onClick={fechar} className="p-2"><X size={22} /></button></div>
+      <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{cartao.nome} · Fatura atual: {rotuloDoMes(mesResumoInicial())}</p>
+      <div className="flex justify-center my-5"><button type="button" aria-label={ouvindo ? "Cancelar gravação" : "Iniciar gravação"} disabled={!suportado || !!resultado} onClick={ouvindo ? cancelarAudio : iniciar} className="rounded-full flex items-center justify-center disabled:opacity-50" style={{ width: 76, height: 76, background: COR.ouro, color: "white", boxShadow: "0 0 0 10px #DBEAFE" }}><Mic size={32} /></button></div>
+      <p role="status" aria-live="polite" className="text-sm text-center mb-3" style={{ color: resultado && !desfeita ? COR.verde : COR.tintaSuave }}>{desfeita ? "Compra desfeita." : resultado ? "Compra adicionada à fatura atual." : ouvindo ? "Ouvindo... fale a compra e aguarde." : "Toque no microfone para falar."}</p>
+      {!suportado && <p className="text-sm mb-3" style={{ color: COR.vermelho }}>Seu navegador não oferece reconhecimento de voz. Tente abrir o app no Chrome ou use Adicionar compra.</p>}
+      {!resultado && <p className="text-xs rounded-xl p-3" style={{ background: COR.papel, color: COR.tintaSuave }}>Exemplo: “Comprei trinta reais no McDonald's hoje. Dividir compra com Filipe.” Compras reconhecidas são adicionadas automaticamente. Use frases com valor, compra e, se desejar, uma pessoa para dividir.</p>}
+      {transcricao && <p className="text-sm rounded-xl p-3 mt-3" style={{ background: COR.papel }}>“{transcricao}”</p>}
+      {erro && <p role="alert" className="text-sm mt-3" style={{ color: COR.vermelho }}>{erro} Nenhuma compra foi adicionada.</p>}
+      {resultado && <div className="mt-4"><p className="text-sm font-semibold">{resultado.compra} · {fmt(resultado.valor)}</p><p className="text-xs mt-1 mb-2" style={{ color: COR.tintaSuave }}>Fatura: {rotuloDoMes(resultado.mes)}</p>{resultado.registros.map((c) => <div key={c.id} className="flex justify-between rounded-xl border px-3 py-2 mt-2 text-sm" style={{ borderColor: COR.linha }}><span>{c.nome}</span><span>{fmt(c.valor)}</span></div>)}{resultado.dividirCom && <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Divisão em partes iguais. Um centavo de diferença, quando necessário, fica na sua parte.</p>}</div>}
+      <div className="flex justify-end gap-3 mt-5">{resultado && !desfeita && <button type="button" onClick={() => { onDesfazer(resultado.registros.map((c) => c.id)); setDesfeita(true); }} className="rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}>Desfazer</button>}<button type="button" onClick={fechar} className="rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ background: COR.ouro }}>{resultado ? "Concluir" : "Cancelar"}</button></div>
+      {!resultado && <p className="text-xs mt-3" style={{ color: COR.tintaSuave }}>O navegador pode usar um serviço online para reconhecer sua voz.</p>}
     </div>
   </div>, document.body);
 }
