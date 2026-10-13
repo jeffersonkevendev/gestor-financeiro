@@ -770,7 +770,7 @@ function MeuCaixaApp({ usuario }) {
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
             { label: "Perfil", Icon: User, ativo: aba === "perfil", acao: () => setAba("perfil") },
             { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => { setCartaoOpcoesId(null); setMostrarAddCartao(false); setNomeNovoCartao(""); setMostrarListaCartoes(true); } },
-            { label: "Calculadora", Icon: IconeCalculadora, ativo: mostrarCalculadora, acao: () => setMostrarCalculadora(true) }
+            { label: "Gráficos", Icon: BarChart3, ativo: aba === "graficos", acao: () => setAba("graficos") }
           ].map(({ label, Icon, ativo, acao }) => (
             <button key={label} aria-current={ativo ? "page" : undefined} onClick={acao} className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] sm:text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
               <Icon size={21} /><span>{label}</span>
@@ -827,6 +827,10 @@ function MeuCaixaApp({ usuario }) {
       {ultimaExclusao && <div role="status" aria-live="polite" className="fixed left-4 right-4 z-50 max-w-sm mx-auto rounded-2xl p-3 flex items-center gap-3 oculta-impressao" style={{ bottom: "calc(82px + env(safe-area-inset-bottom, 0px))", background: COR.tinta, color: "white", boxShadow: "0 8px 24px rgba(15,23,42,0.2)" }}>
         <span className="flex-1 text-sm">{ultimaExclusao.label}</span><button onClick={desfazerExclusao} className="text-sm font-bold py-2" style={{ color: "#93C5FD" }}>Desfazer</button><button aria-label="Fechar aviso de exclusão" onClick={() => setUltimaExclusao(null)} className="p-1"><X size={16} /></button>
       </div>}
+
+      {(aba === "despesas" || aba.startsWith("cartao-")) && !mostrarCalculadora && !mostrarListaCartoes && !cartaoParaExcluir && !ultimaExclusao && (
+        <button type="button" aria-label="Abrir calculadora" title="Calculadora" onClick={() => setMostrarCalculadora(true)} className="fixed z-40 rounded-full flex items-center justify-center oculta-impressao" style={{ width: 56, height: 56, right: "max(20px, calc((100vw - 672px) / 2 + 20px))", bottom: "calc(100px + env(safe-area-inset-bottom, 0px))", background: COR.ouro, color: "#FFFFFF", boxShadow: "0 6px 18px rgba(37,99,235,0.3)" }}><IconeCalculadora size={25} /></button>
+      )}
 
       <Calculadora aberta={mostrarCalculadora} aoFechar={() => setMostrarCalculadora(false)} />
 
@@ -2068,19 +2072,24 @@ function BotaoPrivacidade({ oculto, onClick, cor = COR.ouro }) {
 function dadosEvolucaoMensal(despesas, cartoes, pessoasAutomaticas, cartaoId) {
   const gastos = {}, faturas = {};
   for (const d of despesas) { const mes = chaveDoMes(d.vencimento); gastos[mes] = (gastos[mes] || 0) + Number(d.valor || 0); }
-  for (const c of cartoes.filter((c) => !cartaoId || c.id === cartaoId)) {
+  const todasFaturas = {};
+  for (const c of cartoes) {
     const grupos = {};
     for (const compra of c.compras || []) (grupos[chaveDoMes(compra.data)] ||= []).push(compra);
-    for (const mes of Object.keys(grupos)) faturas[mes] = (faturas[mes] || 0) + totalAutomaticoEmMes(grupos, mes, pessoasAutomaticas);
+    for (const mes of Object.keys(grupos)) {
+      const total = totalAutomaticoEmMes(grupos, mes, pessoasAutomaticas);
+      todasFaturas[mes] = (todasFaturas[mes] || 0) + total;
+      if (!cartaoId || c.id === cartaoId) faturas[mes] = (faturas[mes] || 0) + total;
+    }
   }
-  const chaves = [...new Set([...Object.keys(gastos), ...Object.keys(faturas)])].sort();
+  const chaves = [...new Set([...Object.keys(gastos), ...Object.keys(todasFaturas)])].sort();
   if (!chaves.length) return [];
   const [ano, mes] = chaves[0].split("-").map(Number);
   const data = new Date(ano, mes - 1, 1), ultima = chaves[chaves.length - 1], resultado = [];
   while (true) {
     const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
     if (chave > ultima) break;
-    resultado.push({ mesRotulo: `${MESES[data.getMonth()].slice(0, 3)}/${String(data.getFullYear()).slice(-2)}`, despesas: gastos[chave] || 0, cartao: faturas[chave] || 0 });
+    resultado.push({ mesRotulo: `${MESES[data.getMonth()].slice(0, 3)}/${String(data.getFullYear()).slice(-2)}`, despesas: (gastos[chave] || 0) + (todasFaturas[chave] || 0), cartao: faturas[chave] || 0 });
     data.setMonth(data.getMonth() + 1);
   }
   return resultado.slice(-12);
@@ -2092,7 +2101,7 @@ function GraficosTab({ despesas, cartoes, pessoasAutomaticas, onVoltar }) {
   const dados = useMemo(() => dadosEvolucaoMensal(despesas, cartoes, pessoasAutomaticas, selecionado), [despesas, cartoes, pessoasAutomaticas, selecionado]);
   return <div className="flex flex-col gap-6">
     <div className="flex items-center gap-3"><button type="button" aria-label="Voltar ao início" onClick={onVoltar} className="p-2 rounded-xl" style={{ color: COR.ouro }}><ArrowLeft size={22} /></button><h1 className="text-xl font-bold">Gráficos</h1></div>
-    <p className="text-sm" style={{ color: COR.tintaSuave }}>Evolução dos últimos 12 meses com registros. Despesas e faturas são mostradas separadamente.</p>
+    <p className="text-sm" style={{ color: COR.tintaSuave }}>Evolução dos últimos 12 meses com registros. O total de despesas inclui as faturas de todos os cartões.</p>
     {[{ titulo: "Evolução mensal das despesas", chave: "despesas" }, { titulo: "Evolução mensal do cartão", chave: "cartao" }].map((grafico) => <section key={grafico.chave} className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}>
       <h2 className="font-semibold text-sm mb-3">{grafico.titulo}</h2>
       {grafico.chave === "cartao" && <select aria-label="Cartão do gráfico" value={selecionado} onChange={(e) => setCartaoId(e.target.value)} className="w-full rounded-xl border px-3 py-2 mb-4 text-sm" style={{ borderColor: COR.linha }}><option value="">Todos os cartões</option>{cartoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>}
