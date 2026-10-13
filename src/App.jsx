@@ -1407,8 +1407,8 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
                 {d.paga ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
               </button>
               <button type="button" onClick={() => iniciarEdicao(d)} aria-label={`Editar ${d.descricao}`} className="flex-1 min-w-0 flex items-start gap-3 text-left pt-1">
-                <span className="min-w-0 flex-1"><span className="block text-base font-bold break-words" style={{ color: d.paga ? COR.tintaSuave : COR.tinta }}>{d.descricao}</span><span className="block text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</span>{d.recorrenciaGrupoId && <span className="inline-block rounded-full px-2 py-0.5 text-[10px] mt-1" style={{ background: COR.ouroClaro, color: COR.ouro }}>Mensal</span>}</span>
-                <span className="flex flex-col items-end gap-2 shrink-0"><span className="fonte-mono text-base font-bold" style={{ color: COR.tinta }}>{fmt(d.valor)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: statusDespesa(d).fundo, color: statusDespesa(d).cor }}>{statusDespesa(d).texto}</span></span>
+                <span className="min-w-0 flex-1"><span className="block text-sm font-normal break-words" style={{ color: d.paga ? COR.tintaSuave : COR.tinta }}>{d.descricao}</span><span className="block text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</span>{d.recorrenciaGrupoId && <span className="inline-block rounded-full px-2 py-0.5 text-[10px] mt-1" style={{ background: COR.ouroClaro, color: COR.ouro }}>Mensal</span>}</span>
+                <span className="flex flex-col items-end gap-2 shrink-0"><span className="fonte-mono text-sm font-normal" style={{ color: COR.tinta }}>{fmt(d.valor)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: statusDespesa(d).fundo, color: statusDespesa(d).cor }}>{statusDespesa(d).texto}</span></span>
               </button>
             </div>
           ))}
@@ -1419,8 +1419,8 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
                 <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-1 shrink-0 p-1" aria-label={`${f.pago ? "Marcar como pendente" : "Marcar como paga"}: ${f.label}`} title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
                   {f.pago ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
                 </button>
-                <div className="min-w-0 flex-1 pt-1"><p className="text-base font-bold break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{dataVencimentoCartao(f, mesSelecionado) ? `Vence em ${dataVencimentoCartao(f, mesSelecionado).split("-").reverse().join("/")}` : "Fatura do cartão"}</p></div>
-                <div className="flex flex-col items-end gap-2 pt-1 shrink-0"><span className="fonte-mono text-base font-bold">{fmt(f.total)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: f.pago ? COR.verdeClaro : "#FFEDD5", color: f.pago ? COR.verde : "#9A3412" }}>{f.pago ? "Paga" : "Pendente"}</span></div>
+                <div className="min-w-0 flex-1 pt-1"><p className="text-sm font-normal break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{dataVencimentoCartao(f, mesSelecionado) ? `Vence em ${dataVencimentoCartao(f, mesSelecionado).split("-").reverse().join("/")}` : "Fatura do cartão"}</p></div>
+                <div className="flex flex-col items-end gap-2 pt-1 shrink-0"><span className="fonte-mono text-sm font-normal">{fmt(f.total)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: f.pago ? COR.verdeClaro : "#FFEDD5", color: f.pago ? COR.verde : "#9A3412" }}>{f.pago ? "Paga" : "Pendente"}</span></div>
               </div>
             </div>
           ))}
@@ -1868,9 +1868,10 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
         </div>
       </div>
 
+      <button type="button" onClick={() => setMostrarResumoPessoas(true)} className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}><User size={18} />Resumo por pessoa</button>
+
       <div className="flex items-center gap-2 rounded-2xl border px-3 bg-white oculta-impressao" style={{ borderColor: COR.linha }}><Search size={18} color={COR.tintaSuave} /><input aria-label="Buscar compras" placeholder="Buscar compra ou pessoa" value={buscaCompra} onChange={(e) => setBuscaCompra(e.target.value)} className="busca-compras flex-1 min-w-0 py-3 text-sm outline-none" />{buscaCompra && <button aria-label="Limpar busca" onClick={() => setBuscaCompra("")} className="p-2"><X size={16} /></button>}</div>
 
-      <button type="button" onClick={() => setMostrarResumoPessoas(true)} className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}><User size={18} />Resumo por pessoa</button>
       {mostrarResumoPessoas && <ResumoPessoas cartao={cartao} mes={mesSelecionado} primeiroNomeUsuario={primeiroNomeUsuario} ocultarValores={ocultarValores} onFechar={() => setMostrarResumoPessoas(false)} onAtualizarRecebimentos={onAtualizarRecebimentos} onVerCompras={(nome) => { setPessoasSelecionadas([nome]); setBuscaCompra(""); setMostrarResumoPessoas(false); }} />}
 
       {mostrarForm && (
