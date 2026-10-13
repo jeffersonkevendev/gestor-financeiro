@@ -478,6 +478,7 @@ function MeuCaixaApp({ usuario }) {
   const [erroSaida, setErroSaida] = useState("");
   const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, orcamentoMensal, setOrcamentoMensal, carregando, salvando, temPendencias, erroNuvem, tentarNovamente } = useDadosNuvem(usuario.uid);
   const [mostrarListaCartoes, setMostrarListaCartoes] = useState(false);
+  const [cartaoOpcoesId, setCartaoOpcoesId] = useState(null);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
   const [cartaoSelecionadoId, setCartaoSelecionadoId] = useState(null);
   const [mostrarNovaReceita, setMostrarNovaReceita] = useState(false);
@@ -553,7 +554,7 @@ function MeuCaixaApp({ usuario }) {
     setMostrarListaCartoes(false);
   };
 
-  const fecharPopupCartoes = () => { setMostrarListaCartoes(false); setMostrarAddCartao(false); setNomeNovoCartao(""); };
+  const fecharPopupCartoes = () => { setCartaoOpcoesId(null); setMostrarListaCartoes(false); setMostrarAddCartao(false); setNomeNovoCartao(""); };
 
   const excluirCartao = (id) => {
     if (aba === `cartao-${id}`) setAba("inicio");
@@ -740,7 +741,7 @@ function MeuCaixaApp({ usuario }) {
           {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
             { label: "Perfil", Icon: User, ativo: aba === "perfil", acao: () => setAba("perfil") },
-            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => { setMostrarAddCartao(false); setNomeNovoCartao(""); setMostrarListaCartoes(true); } },
+            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => { setCartaoOpcoesId(null); setMostrarAddCartao(false); setNomeNovoCartao(""); setMostrarListaCartoes(true); } },
             { label: "Calculadora", Icon: IconeCalculadora, ativo: mostrarCalculadora, acao: () => setMostrarCalculadora(true) }
           ].map(({ label, Icon, ativo, acao }) => (
             <button key={label} aria-current={ativo ? "page" : undefined} onClick={acao} className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] sm:text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
@@ -775,12 +776,17 @@ function MeuCaixaApp({ usuario }) {
               </form>
             ) : (
               <div className="flex flex-col gap-3">
-                {cartoes.map((c) => <div key={c.id} className="flex items-center rounded-xl border" style={{ borderColor: COR.linha }}>
-                  <button type="button" onClick={() => { setAba(`cartao-${c.id}`); fecharPopupCartoes(); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span><ChevronRight size={18} /></button>
-                  <button type="button" aria-label={`Excluir ${c.nome}`} title={`Excluir ${c.nome}`} onClick={() => { fecharPopupCartoes(); setCartaoParaExcluir(c); }} className="p-3 shrink-0" style={{ color: COR.vermelho }}><Trash2 size={20} /></button>
+                {cartoes.map((c) => <div key={c.id} className="rounded-xl border overflow-hidden" style={{ borderColor: COR.linha }}>
+                  <div className="flex items-center">
+                    <button type="button" aria-label={`Abrir ${c.nome}`} onClick={() => { setAba(`cartao-${c.id}`); fecharPopupCartoes(); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span></button>
+                    <button type="button" aria-label={`Opções de ${c.nome}`} aria-expanded={cartaoOpcoesId === c.id} onClick={() => setCartaoOpcoesId((atual) => atual === c.id ? null : c.id)} className="p-4 shrink-0" style={{ color: COR.tintaSuave }}><ChevronRight size={20} style={{ transform: cartaoOpcoesId === c.id ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms" }} /></button>
+                  </div>
+                  {cartaoOpcoesId === c.id && <div className="flex justify-end p-2" style={{ borderTop: `1px solid ${COR.linha}`, background: COR.papel }}>
+                    <button type="button" aria-label={`Excluir ${c.nome}`} title={`Excluir ${c.nome}`} onClick={() => { fecharPopupCartoes(); setCartaoParaExcluir(c); }} className="flex items-center gap-2 p-2 rounded-lg text-sm font-semibold" style={{ color: COR.vermelho }}><Trash2 size={18} />Excluir cartão</button>
+                  </div>}
                 </div>)}
                 {!cartoes.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado.</p>}
-                <button type="button" onClick={() => { setNomeNovoCartao(""); setMostrarAddCartao(true); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
+                <button type="button" onClick={() => { setCartaoOpcoesId(null); setNomeNovoCartao(""); setMostrarAddCartao(true); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
               </div>
             )}
           </div>
