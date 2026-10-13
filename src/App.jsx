@@ -275,6 +275,7 @@ function useDadosNuvem(uid) {
 }
 
 function TelaErroNuvem({ mensagem, temPendencias, salvando, tentarNovamente }) {
+  const [ultimoCartaoId, setUltimoCartaoId] = useLocalStorageState(`meu-caixa:${usuario.uid}:ultimo-cartao`, null);
   const [erroSaida, setErroSaida] = useState("");
   const sair = async () => {
     try { await signOut(auth); }
@@ -496,6 +497,22 @@ function MeuCaixaApp({ usuario }) {
     if (primeiroNomeDoUsuario) nomes.add(primeiroNomeDoUsuario);
     return [...nomes];
   }, [nomeDoUsuario, primeiroNomeDoUsuario]);
+
+  useEffect(() => {
+    if (aba.startsWith("cartao-")) {
+      const id = aba.slice(7);
+      if (cartoes.some((c) => String(c.id) === id)) setUltimoCartaoId(id);
+    }
+  }, [aba, cartoes]);
+
+  const abrirCartoes = () => {
+    setCartaoOpcoesId(null); setMostrarAddCartao(false); setNomeNovoCartao("");
+    const ultimo = cartoes.find((c) => String(c.id) === String(ultimoCartaoId));
+    const destino = cartoes.length === 1 ? cartoes[0] : ultimo;
+    if (destino && (cartoes.length === 1 || aba !== `cartao-${destino.id}`)) {
+      setMostrarListaCartoes(false); setAba(`cartao-${destino.id}`);
+    } else setMostrarListaCartoes(true);
+  };
 
   // ---------- navegação (abas deslizáveis) ----------
   const abas = ["inicio", "despesas", "perfil", "graficos", ...cartoes.map((c) => `cartao-${c.id}`)];
@@ -754,6 +771,7 @@ function MeuCaixaApp({ usuario }) {
                   setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
                 }
                 onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "compra", cartaoId: cartao.id, itens, label: itens.length > 1 ? "Compra e parcelas excluídas" : "Compra excluída" })}
+                onAbrirSeusCartoes={() => { setCartaoOpcoesId(null); setMostrarAddCartao(false); setMostrarListaCartoes(true); }}
                 primeiroNomeUsuario={primeiroNomeDoUsuario}
                 onAtualizarRecebimentos={(chave, registro) => setCartoes((prev) => prev.map((c) => c.id === cartao.id ? { ...c, recebimentosPorPessoa: { ...(c.recebimentosPorPessoa || {}), [chave]: registro } } : c))}
                 onGerarPdf={gerarRelatorio}
@@ -771,7 +789,7 @@ function MeuCaixaApp({ usuario }) {
           {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
             { label: "Perfil", Icon: User, ativo: aba === "perfil", acao: () => setAba("perfil") },
-            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => { setCartaoOpcoesId(null); setMostrarAddCartao(false); setNomeNovoCartao(""); setMostrarListaCartoes(true); } },
+            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: abrirCartoes },
             { label: "Gráficos", Icon: BarChart3, ativo: aba === "graficos", acao: () => setAba("graficos") }
           ].map(({ label, Icon, ativo, acao }) => (
             <button key={label} aria-current={ativo ? "page" : undefined} onClick={acao} className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] sm:text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
@@ -1640,7 +1658,7 @@ function OpcaoDividirCompra({ ativa, onAtiva, pessoa, onPessoa, nome, valor, neg
 }
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
-function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
+function CartaoTab({ cartao, onAbrirSeusCartoes, primeiroNomeUsuario, onAtualizarRecebimentos, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
   const [ocultarValores, setOcultarValores] = useState(false);
   const valorVisivel = (valor) => ocultarValores ? "R$ ••••" : fmt(valor);
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
@@ -2056,7 +2074,8 @@ function CartaoTab({ cartao, primeiroNomeUsuario, onAtualizarRecebimentos, onAtu
         </div>
       )}
 
-      <div className="pt-2 oculta-impressao">
+      <div className="pt-2 flex flex-col gap-3 oculta-impressao">
+        <button type="button" onClick={onAbrirSeusCartoes} className="w-full flex items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-semibold" style={{ background: COR.cartao, color: COR.ouro, borderColor: COR.linha }}><CreditCard size={18} />Seus cartões</button>
         <button onClick={onPedirExclusao} className="w-full flex items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro, borderColor: "#BFDBFE" }}>
           <Trash2 size={16} /> Excluir este cartão
         </button>
@@ -2147,8 +2166,8 @@ function ResumoPessoas({ cartao, mes, primeiroNomeUsuario, ocultarValores, onFec
       <p className="text-sm mt-1 mb-4" style={{ color: COR.tintaSuave }}>{cartao.nome} · {rotuloDoMes(mes)}</p>
       <div className="rounded-2xl border p-4 mb-4" style={{ background: COR.cartao, borderColor: COR.linha }}><p className="text-sm" style={{ color: COR.tintaSuave }}>Total da fatura</p><p className="text-2xl font-bold mt-1">{valor(total)}</p></div>
       <div className="flex flex-col gap-3">{pessoas.map((p) => <div key={p.id} className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}>
-        <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{p.nome}</h3><p className="font-bold mt-1">{valor(p.total)}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{p.quantidade} {p.quantidade === 1 ? "lançamento" : "lançamentos"}</p></div><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: p.total <= 0 ? COR.papelEscuro : p.recebido ? COR.verdeClaro : "#FEF0D6", color: p.total <= 0 ? COR.tintaSuave : p.recebido ? COR.verde : "#92400E" }}>{p.total <= 0 ? "Sem valor a receber" : p.recebido ? "Recebido" : "Pendente"}</span></div>
-        <div className="grid grid-cols-2 items-stretch gap-2 mt-3">{p.total > 0 && <button type="button" onClick={() => onAtualizarRecebimentos(p.chave, { recebido: !p.recebido, totalCentavos: p.totalCentavos, atualizadoEm: new Date().toISOString() })} className="flex items-center justify-center text-center rounded-xl px-2 py-2 text-xs font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro, minHeight: 44 }}>{p.recebido ? "Desfazer recebimento" : "Marcar como recebido"}</button>}<button type="button" onClick={() => onVerCompras(p.nome)} className="flex items-center justify-center text-center rounded-xl px-2 py-2 text-xs font-semibold" style={{ color: COR.ouro, minHeight: 44, gridColumn: p.total > 0 ? undefined : "1 / -1" }}>Ver compras</button></div>
+        <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">{p.nome}</h3><p className="font-bold mt-1">{valor(p.total)}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{p.quantidade} {p.quantidade === 1 ? "lançamento" : "lançamentos"}</p></div><div className="flex flex-col items-end shrink-0"><span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: p.total <= 0 ? COR.papelEscuro : p.recebido ? COR.verdeClaro : "#FEF0D6", color: p.total <= 0 ? COR.tintaSuave : p.recebido ? COR.verde : "#92400E" }}>{p.total <= 0 ? "Sem valor a receber" : p.recebido ? "Recebido" : "Pendente"}</span><button type="button" onClick={() => onVerCompras(p.nome)} className="text-xs font-semibold whitespace-nowrap rounded-xl py-2 mt-2" style={{ color: COR.ouro }}>Ver compras</button></div></div>
+        {p.total > 0 && <div className="mt-3"><button type="button" onClick={() => onAtualizarRecebimentos(p.chave, { recebido: !p.recebido, totalCentavos: p.totalCentavos, atualizadoEm: new Date().toISOString() })} className="inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro, minHeight: 44 }}>{p.recebido ? "Desfazer recebimento" : "Marcar como recebido"}</button></div>}
       </div>)}</div>
       {!pessoas.length && <p className="text-sm py-5" style={{ color: COR.tintaSuave }}>Nenhuma compra neste mês.</p>}
       <div className="grid grid-cols-2 gap-3 rounded-2xl border p-4 mt-4" style={{ background: COR.cartao, borderColor: COR.linha }}><div><p className="text-xs" style={{ color: COR.tintaSuave }}>A receber</p><p className="font-bold mt-1" style={{ color: "#92400E" }}>{valor(pendente)}</p></div><div><p className="text-xs" style={{ color: COR.tintaSuave }}>Recebido</p><p className="font-bold mt-1" style={{ color: COR.verde }}>{valor(recebido)}</p></div></div>
