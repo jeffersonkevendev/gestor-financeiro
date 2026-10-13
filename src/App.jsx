@@ -498,7 +498,7 @@ function MeuCaixaApp({ usuario }) {
   }, [nomeDoUsuario, primeiroNomeDoUsuario]);
 
   // ---------- navegação (abas deslizáveis) ----------
-  const abas = ["inicio", "despesas", "perfil", ...cartoes.map((c) => `cartao-${c.id}`)];
+  const abas = ["inicio", "despesas", "perfil", "graficos", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
   const indiceAba = indiceAbaBruto === -1 ? 0 : indiceAbaBruto;
 
@@ -631,8 +631,8 @@ function MeuCaixaApp({ usuario }) {
   };
 
   const cartaoAtivo = cartoes.find((c) => `cartao-${c.id}` === aba);
-  const acento = aba === "despesas" || aba === "inicio" || aba === "perfil" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
-  const acentoClaro = aba === "despesas" || aba === "inicio" || aba === "perfil" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
+  const acento = aba === "despesas" || aba === "inicio" || aba === "perfil" || aba === "graficos" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
+  const acentoClaro = aba === "despesas" || aba === "inicio" || aba === "perfil" || aba === "graficos" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
   // ---------- receitas ----------
   const adicionarOuAtualizarReceita = (dadosReceita) => {
@@ -745,6 +745,7 @@ function MeuCaixaApp({ usuario }) {
           <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
             <PerfilTab usuario={usuario} onExportar={exportarDados} onSair={sairDaConta} temPendencias={temPendencias} erroSaida={erroSaida} />
           </div>
+          <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao"><GraficosTab despesas={despesas} cartoes={cartoes} pessoasAutomaticas={pessoasAutomaticas} onVoltar={() => setAba("inicio")} /></div>
           {cartoes.map((cartao) => (
             <div key={cartao.id} className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0">
               <CartaoTab
@@ -1092,6 +1093,8 @@ function restaurarRegistrosPorId(atuais, removidos) {
 
 // ===================== ABA INÍCIO =====================
 function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirCalculadora }) {
+  const [ocultarValores, setOcultarValores] = useState(false);
+  const valorVisivel = (valor) => ocultarValores ? "R$ ••••" : fmt(valor);
   const [mesAtual, setMesAtual] = useState(() => mesResumoInicial());
   useEffect(() => {
     const atualizarMes = () => setMesAtual(mesResumoInicial());
@@ -1128,7 +1131,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
         <p className="fonte-display text-2xl" style={{ color: COR.texto }}>
           Olá{primeiroNome ? `, ${primeiroNome}` : ""}
         </p>
-        <p className="text-sm" style={{ color: COR.tintaSuave }}>{rotuloDoMes(mesAtual)}</p>
+        <div className="flex items-center justify-between"><p className="text-sm" style={{ color: COR.tintaSuave }}>{rotuloDoMes(mesAtual)}</p><BotaoPrivacidade oculto={ocultarValores} onClick={() => setOcultarValores((v) => !v)} /></div>
       </div>
 
       <button
@@ -1139,17 +1142,17 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
         }}
       >
         <p className="text-[11px] uppercase tracking-widest font-semibold" style={{ color: COR.ouroClaro }}>Despesas do Mês</p>
-        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{fmt(totalGeralMes)}</p>
+        <p className="fonte-mono text-3xl font-bold mt-1" style={{ color: COR.papel }}>{valorVisivel(totalGeralMes)}</p>
       </button>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#2DB978" }}><Check size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pago</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{fmt(totalPagoMes)}</p></div>
+          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pago</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalPagoMes)}</p></div>
         </div>
         <div className="rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#F5A623" }}><Clock size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pendente</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{fmt(totalGeralMes - totalPagoMes)}</p></div>
+          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pendente</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalGeralMes - totalPagoMes)}</p></div>
         </div>
       </div>
       <div>
@@ -1166,7 +1169,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
                 <IconeBanco cartao={c} />
                 <div className="min-w-0">
                   <span className="block text-sm font-semibold truncate" style={{ color: COR.texto }}>{c.nome}</span>
-                  <span className="block fonte-mono text-base font-bold mt-1" style={{ color: COR.texto }}>{fmt(c.totalMes)}</span>
+                  <span className="block fonte-mono text-base font-bold mt-1" style={{ color: COR.texto }}>{valorVisivel(c.totalMes)}</span>
                 </div>
               </div>
               <ChevronRight size={20} color={COR.tintaSuave} className="shrink-0 ml-2" aria-hidden="true" />
@@ -1189,6 +1192,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
       >
         <IconeCalculadora size={16} /> Calculadora
       </button>
+      <button onClick={() => onIrPara("graficos")} className="col-span-2 flex items-center justify-center gap-2 rounded-2xl p-4 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}><BarChart3 size={18} />Gráficos</button>
       </div>
       </div>
     </div>
@@ -1267,13 +1271,6 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
   const toggleCartaoPago = (chave) => {
     onAtualizarPagamentosCartao((prev) => ({ ...prev, [chave]: !prev[chave] }));
   };
-
-  const dadosGrafico = useMemo(() => chaves.slice(-12).map((chave) => {
-    const totalD = (despesasPorMes[chave] || []).reduce((s, d) => s + d.valor, 0);
-    const totalC = fontesCartao.reduce((s, f) => s + f.totalPorMes(chave), 0);
-    const [, m] = chave.split("-");
-    return { mesRotulo: MESES[parseInt(m, 10) - 1].slice(0, 3), total: totalD + totalC };
-  }), [chaves, despesasPorMes, fontesCartao]);
 
   const adicionar = () => {
     const valor = valorMascaradoParaNumero(nova.valor);
@@ -1453,22 +1450,6 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
         </div>, document.body
       )}
 
-      {dadosGrafico.length > 0 && (
-        <div className="rounded-2xl p-4" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
-          <p className="text-sm font-semibold mb-3" style={{ color: COR.texto }}>Evolução mensal</p>
-          <div style={{ width: "100%", height: 200 }}>
-            <ResponsiveContainer>
-              <BarChart data={dadosGrafico}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COR.linha} />
-                <XAxis dataKey="mesRotulo" tick={{ fontSize: 11, fill: COR.tintaSuave }} axisLine={{ stroke: COR.linha }} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: COR.tintaSuave }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v) => fmt(v)} contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: COR.linha }} />
-                <Bar dataKey="total" fill={COR.ouro} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1654,6 +1635,8 @@ function OpcaoDividirCompra({ ativa, onAtiva, pessoa, onPessoa, nome, valor, neg
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
 function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
+  const [ocultarValores, setOcultarValores] = useState(false);
+  const valorVisivel = (valor) => ocultarValores ? "R$ ••••" : fmt(valor);
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
 
   // null seleciona todas as pessoas, inclusive novos nomes adicionados depois.
@@ -1823,7 +1806,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       <div className="oculta-impressao">
         {mesSelecionado === mesResumoInicial() && <h2 className="text-base font-bold mb-2" style={{ color: COR.ouro }}>Fatura Atual</h2>}
         <div className="rounded-2xl px-5 py-4" style={{ background: corPrincipal }}>
-          <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
+          <div className="flex items-center justify-between gap-3"><p className="fonte-mono text-3xl font-bold text-white">{valorVisivel(totalMes)}</p><BotaoPrivacidade oculto={ocultarValores} onClick={() => setOcultarValores((v) => !v)} cor="#FFFFFF" /></div>
           {dataVencimentoCartao(cartao, mesSelecionado) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: {dataVencimentoCartao(cartao, mesSelecionado).slice(-2)} de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
         </div>
       </div>
@@ -2054,7 +2037,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                     <p className="text-sm font-medium break-words min-w-0 flex-1">{c.compra}</p>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="fonte-mono text-sm font-semibold">{fmt(c.valor)}</span>
+                    <span className="fonte-mono text-sm font-semibold">{valorVisivel(c.valor)}</span>
                     <div className="flex items-center gap-3">
                       <button onClick={() => iniciarEdicao(c)} style={{ color: COR.tintaSuave }}><Pencil size={14} /></button>
                       <BotaoExcluirConfirmar descricao={dadosParcelamento(c).parcelada ? "Excluir todas as parcelas desta compra" : "Excluir compra"} aviso={dadosParcelamento(c).parcelada ? (c.compartilhamentoId ? "Todas as parcelas das duas pessoas" : "Todas as parcelas") : ""} onConfirmar={() => excluir(c.id)} />
@@ -2076,3 +2059,44 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   );
 }
 
+
+function BotaoPrivacidade({ oculto, onClick, cor = COR.ouro }) {
+  const Icon = oculto ? EyeOff : Eye;
+  return <button type="button" onClick={onClick} aria-label={oculto ? "Mostrar valores" : "Ocultar valores"} aria-pressed={oculto} className="p-2 rounded-xl shrink-0" style={{ color: cor }}><Icon size={22} /></button>;
+}
+
+function dadosEvolucaoMensal(despesas, cartoes, pessoasAutomaticas, cartaoId) {
+  const gastos = {}, faturas = {};
+  for (const d of despesas) { const mes = chaveDoMes(d.vencimento); gastos[mes] = (gastos[mes] || 0) + Number(d.valor || 0); }
+  for (const c of cartoes.filter((c) => !cartaoId || c.id === cartaoId)) {
+    const grupos = {};
+    for (const compra of c.compras || []) (grupos[chaveDoMes(compra.data)] ||= []).push(compra);
+    for (const mes of Object.keys(grupos)) faturas[mes] = (faturas[mes] || 0) + totalAutomaticoEmMes(grupos, mes, pessoasAutomaticas);
+  }
+  const chaves = [...new Set([...Object.keys(gastos), ...Object.keys(faturas)])].sort();
+  if (!chaves.length) return [];
+  const [ano, mes] = chaves[0].split("-").map(Number);
+  const data = new Date(ano, mes - 1, 1), ultima = chaves[chaves.length - 1], resultado = [];
+  while (true) {
+    const chave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+    if (chave > ultima) break;
+    resultado.push({ mesRotulo: `${MESES[data.getMonth()].slice(0, 3)}/${String(data.getFullYear()).slice(-2)}`, despesas: gastos[chave] || 0, cartao: faturas[chave] || 0 });
+    data.setMonth(data.getMonth() + 1);
+  }
+  return resultado.slice(-12);
+}
+
+function GraficosTab({ despesas, cartoes, pessoasAutomaticas, onVoltar }) {
+  const [cartaoId, setCartaoId] = useState("");
+  const selecionado = cartoes.some((c) => c.id === cartaoId) ? cartaoId : "";
+  const dados = useMemo(() => dadosEvolucaoMensal(despesas, cartoes, pessoasAutomaticas, selecionado), [despesas, cartoes, pessoasAutomaticas, selecionado]);
+  return <div className="flex flex-col gap-6">
+    <div className="flex items-center gap-3"><button type="button" aria-label="Voltar ao início" onClick={onVoltar} className="p-2 rounded-xl" style={{ color: COR.ouro }}><ArrowLeft size={22} /></button><h1 className="text-xl font-bold">Gráficos</h1></div>
+    <p className="text-sm" style={{ color: COR.tintaSuave }}>Evolução dos últimos 12 meses com registros. Despesas e faturas são mostradas separadamente.</p>
+    {[{ titulo: "Evolução mensal das despesas", chave: "despesas" }, { titulo: "Evolução mensal do cartão", chave: "cartao" }].map((grafico) => <section key={grafico.chave} className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha }}>
+      <h2 className="font-semibold text-sm mb-3">{grafico.titulo}</h2>
+      {grafico.chave === "cartao" && <select aria-label="Cartão do gráfico" value={selecionado} onChange={(e) => setCartaoId(e.target.value)} className="w-full rounded-xl border px-3 py-2 mb-4 text-sm" style={{ borderColor: COR.linha }}><option value="">Todos os cartões</option>{cartoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select>}
+      {dados.length ? <div style={{ width: "100%", height: 230 }}><ResponsiveContainer><BarChart data={dados}><CartesianGrid strokeDasharray="3 3" stroke={COR.linha} /><XAxis dataKey="mesRotulo" tick={{ fontSize: 10, fill: COR.tintaSuave }} tickLine={false} /><YAxis width={56} tick={{ fontSize: 10, fill: COR.tintaSuave }} tickFormatter={(v) => `R$${v}`} /><Tooltip formatter={(v) => fmt(v)} contentStyle={{ borderRadius: 12, borderColor: COR.linha }} /><Bar dataKey={grafico.chave} name={grafico.chave === "despesas" ? "Despesas" : "Fatura"} fill={COR.ouro} radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div> : <p className="text-sm py-6" style={{ color: COR.tintaSuave }}>Adicione despesas ou compras para ver a evolução mensal.</p>}
+    </section>)}
+  </div>;
+}
