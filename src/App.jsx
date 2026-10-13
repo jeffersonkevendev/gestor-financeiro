@@ -1870,7 +1870,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
             onClick={gerarRelatorioPdf}
             disabled={linhasMes.length === 0 || gerandoImagem}
             className="flex items-center gap-1.5 px-3 h-11 rounded-2xl text-sm font-semibold text-white disabled:opacity-40"
-            style={{ background: COR.tinta }}
+            style={{ background: COR.ouroClaro, color: COR.ouro }}
             title={pessoaFiltro === "todos" ? "Gera uma imagem do relatório do mês selecionado" : `Gera uma imagem do relatório de ${pessoaFiltro} no mês selecionado`}
           >
             <FileDown size={15} /> {gerandoImagem ? "Gerando..." : "Gerar imagem"}
@@ -1983,7 +1983,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       )}
 
       {linhasMes.length > 0 && (
-        <div className="rounded-2xl oculta-impressao overflow-y-auto max-h-96" style={{ background: COR.cartao, border: `1px solid ${COR.linha}`, paddingBottom: 64 }}>
+        <div className="rounded-2xl oculta-impressao overflow-y-auto max-h-96" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
           {linhasMes.map((c, i) => (
             <div key={c.id} style={{ borderTop: i === 0 ? "none" : `1px solid ${COR.linha}` }}>
               {editandoId === c.id ? (
@@ -2068,8 +2068,8 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
       )}
 
       <div className="pt-2 oculta-impressao">
-        <button onClick={onPedirExclusao} className="w-full text-center text-xs font-medium py-1" style={{ color: COR.tintaSuave }}>
-          Excluir este cartão
+        <button onClick={onPedirExclusao} className="w-full flex items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro, borderColor: "#BFDBFE" }}>
+          <Trash2 size={16} /> Excluir este cartão
         </button>
       </div>
     </div>
