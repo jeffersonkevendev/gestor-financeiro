@@ -1855,7 +1855,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
                   <button type="button" onClick={() => setPessoasSelecionadas([])} className="px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: COR.papelEscuro, color: COR.tintaSuave }}>Limpar seleção</button>
                 </div>
                 <div className="flex flex-col min-h-0 overflow-y-auto">
-                  {nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm cursor-pointer shrink-0" style={{ background: (todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))) ? corClara : "transparent" }}>
+                  {nomesUnicos.map((nome) => <label key={nome} className="flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm cursor-pointer shrink-0" style={{ background: "transparent" }}>
                     <input type="checkbox" checked={todasPessoas || selecaoValida.some((n) => n.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))} onChange={() => alternarPessoa(nome)} style={{ accentColor: corPrincipal, minHeight: 16, width: 16, height: 16 }} />{nome}
                   </label>)}
                 </div>
