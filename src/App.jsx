@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
-  Settings2, Search, Mic, ShoppingCart, Filter, Image as IconeImagem, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  Settings2, Search, Mic, ShoppingCart, Filter, Image as IconeImagem, Car, Utensils, Cross, Wifi, Flame, Gift, Smartphone, GraduationCap, Shirt, Dumbbell, HeartPulse, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -79,12 +79,12 @@ function identificarBancoCartao(cartao) {
 }
 
 // Símbolo vetorial do cabeçalho oficial: https://nubank.com.br/
-function IconeBanco({ cartao }) {
+function IconeBanco({ cartao, tamanho = 48 }) {
   const banco = identificarBancoCartao(cartao);
   const nubank = banco === "nubank";
   const logo = LOGOS_BANCOS[banco];
   return (
-    <span className="shrink-0 flex items-center justify-center rounded-2xl" style={{ width: 48, height: 48, background: nubank ? "#820AD1" : (logo ? "#FFFFFF" : (cartao.cor || COR.ouro)), color: "white" }}>
+    <span className="shrink-0 flex items-center justify-center rounded-2xl" style={{ width: tamanho, height: tamanho, background: nubank ? "#820AD1" : (logo ? "#FFFFFF" : (cartao.cor || COR.ouro)), color: "white" }}>
       {nubank ? (
         <svg aria-hidden="true" focusable="false" width="30" height="18" viewBox="0 0 44 24" fill="none">
           <path d="M0.0243654 9.87682C-0.0304567 10.9469 0.0243654 12.042 0.0243654 13.1171V23.4431H5.83551V13.9822C5.83551 11.0319 5.81557 8.41669 5.83551 7.88164C5.94515 5.33141 6.64289 3.65626 7.95364 2.29613C7.85894 2.29613 7.7493 2.28613 7.65461 2.28613C4.82379 2.28613 2.16741 3.90628 0.8766 6.40651C0.293492 7.51161 0.0891551 8.69171 0.0243654 9.88182V9.87682Z" fill="currentColor" />
@@ -1416,7 +1416,7 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
           {linhasVisiveis.map((d) => (
             <div key={d.id} className="rounded-2xl border p-4 flex items-start gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
               <button onClick={() => togglePaga(d.id)} className="mt-1 shrink-0 relative" title={d.paga ? "Marcar como pendente" : "Marcar como paga"} aria-label={`${d.paga ? "Marcar como pendente" : "Marcar como paga"}: ${d.descricao}`}>
-                <LogoLancamento texto={d.descricao} tipo="despesa" />
+                <LogoLancamento texto={d.descricao} tipo="despesa" categoria={d.categoria} />
                 <span className="absolute -bottom-1 -right-1 rounded-full bg-white" aria-hidden="true">{d.paga ? <CheckCircle2 size={15} color={COR.verde} /> : <Circle size={15} color="#A8B0BC" />}</span>
               </button>
               <button type="button" onClick={() => iniciarEdicao(d)} aria-label={`Editar ${d.descricao}`} className="flex-1 min-w-0 flex items-start gap-3 text-left pt-1">
@@ -1429,8 +1429,9 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
           {cartoesVisiveis.map((f) => (
             <div key={f.id} className="rounded-2xl border p-4" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
               <div className="flex items-start gap-3">
-                <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-1 shrink-0 p-1" aria-label={`${f.pago ? "Marcar como pendente" : "Marcar como paga"}: ${f.label}`} title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
-                  {f.pago ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
+                <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-1 shrink-0 relative" aria-label={`${f.pago ? "Marcar como pendente" : "Marcar como paga"}: ${f.label}`} title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
+                  <IconeBanco cartao={{ ...f, nome: f.label }} tamanho={40} />
+                  <span className="absolute -bottom-1 -right-1 rounded-full bg-white" aria-hidden="true">{f.pago ? <CheckCircle2 size={15} color={COR.verde} /> : <Circle size={15} color="#A8B0BC" />}</span>
                 </button>
                 <div className="min-w-0 flex-1 pt-1"><p className="text-sm font-normal break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{dataVencimentoCartao(f, mesSelecionado) ? `Vence em ${dataVencimentoCartao(f, mesSelecionado).split("-").reverse().join("/")}` : "Fatura do cartão"}</p></div>
                 <div className="flex flex-col items-end gap-2 pt-1 shrink-0"><span className="fonte-mono text-sm font-normal">{fmt(f.total)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: f.pago ? COR.verdeClaro : "#FFEDD5", color: f.pago ? COR.verde : "#9A3412" }}>{f.pago ? "Paga" : "Pendente"}</span></div>
@@ -2280,11 +2281,75 @@ function marcaDoLancamento(texto, tipo = "compra") {
   return null;
 }
 
-function LogoLancamento({ texto, tipo = "compra" }) {
-  const marca = marcaDoLancamento(texto, tipo), logo = LOGOS_LANCAMENTOS[marca];
-  const [falhou, setFalhou] = useState(false);
-  useEffect(() => setFalhou(false), [marca]);
-  return <span className="shrink-0 rounded-full flex items-center justify-center overflow-hidden" style={{ width: 40, height: 40, background: logo?.fundo || COR.papelEscuro, border: `1px solid ${COR.linha}` }}>
-    {logo && !falhou ? <img src={logo.imagem} alt={`Logo ${logo.nome}`} onError={() => setFalhou(true)} style={{ width: 32, height: 32, objectFit: "contain" }} /> : tipo === "compra" ? <ShoppingCart size={19} color={COR.tintaSuave} aria-hidden="true" /> : <Wallet size={19} color={COR.tintaSuave} aria-hidden="true" />}
+
+// O serviço recebe só o domínio público da empresa, sem dados da compra.
+const LOGOS_EXTERNAS_INDISPONIVEIS = new Set();
+const DOMINIOS_EMPRESAS = [
+  [/\bifood\b/, "ifood.com.br"], [/\bspotify\b/, "spotify.com"], [/\bdisney(?:\s*plus|\s*\+)?\b/, "disneyplus.com"],
+  [/\byoutube\b/, "youtube.com"], [/\bprime\s*video\b/, "primevideo.com"], [/\bapple\b/, "apple.com"],
+  [/\bgoogle\b/, "google.com"], [/\bmicrosoft\b/, "microsoft.com"], [/\bshopee\b/, "shopee.com.br"],
+  [/\bmercado\s*livre\b/, "mercadolivre.com.br"], [/\baliexpress\b/, "aliexpress.com"],
+  [/\bmagalu\b|\bmagazine\s*luiza\b/, "magazineluiza.com.br"], [/\bamericanas\b/, "americanas.com.br"],
+  [/\bshein\b/, "shein.com"], [/\bdrogasil\b/, "drogasil.com.br"], [/\bdroga\s*raia\b/, "drogaraia.com.br"],
+  [/\bpague\s*menos\b/, "paguemenos.com.br"], [/\bclaro\b/, "claro.com.br"], [/\bvivo\b/, "vivo.com.br"],
+  [/\btim\b/, "tim.com.br"], [/\bcarrefour\b/, "carrefour.com.br"], [/\batacadao\b/, "atacadao.com.br"], [/\bassai\b/, "assai.com.br"],
+];
+
+function dominioDaEmpresa(texto) {
+  const bruto = String(texto || "").toLowerCase();
+  // Não usa endereços de e-mail nem inventa domínios a partir de nomes desconhecidos.
+  const dominio = bruto.match(/(?:^|[\s(])(?:https?:\/\/)?(?:www\.)?((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})(?=[\s/)?:#.,;]|$)/);
+  if (dominio) return dominio[1].replace(/^www\./, "");
+  const nome = normalizarBusca(texto);
+  for (const [padrao, site] of DOMINIOS_EMPRESAS) if (padrao.test(nome)) return site;
+  return null;
+}
+
+function categoriaIconeLancamento(texto, categoria = "", tipo = "compra") {
+  const nome = normalizarBusca(texto), completo = `${nome} ${normalizarBusca(categoria)}`;
+  if (/farmacia|drogaria|drogasil|droga\s*raia|pague\s*menos|medicamento|remedio/.test(nome)) return "farmacia";
+  if (/supermercado|mercado|mercearia|atacadao|assai|carrefour|hortifruti|compras/.test(nome)) return "compras";
+  if (/transporte|uber|\b99\b|taxi|carro|combustivel|gasolina|estacionamento|onibus|passagem/.test(completo)) return "transporte";
+  if (/alimentacao|comida|restaurante|lanchonete|lanche|almoco|jantar|pizza|pizzaria|ifood|mcdonald|hamburguer|padaria/.test(completo)) return "comida";
+  if (/internet|wifi|\bwi-fi\b|telecom/.test(nome)) return "internet";
+  if (/\bgas\b|ultragaz/.test(nome)) return "gas";
+  if (/celular|smartphone|telefone/.test(nome)) return "celular";
+  if (/educacao|escola|faculdade|curso|livro/.test(completo)) return "educacao";
+  if (/roupa|vestuario|camisa|sapato|calcado/.test(nome)) return "roupas";
+  if (/academia|musculacao|fitness/.test(nome)) return "academia";
+  if (/saude|medico|consulta|hospital|exame/.test(completo)) return "saude";
+  if (/presente/.test(nome)) return "presente";
+  if (/moradia|condominio|financiamento|aluguel/.test(completo)) return "casa";
+  return tipo === "compra" ? "compras" : "conta";
+}
+
+const ICONES_LANCAMENTOS = {
+  compras: { Icon: ShoppingCart, cor: "#2563EB", fundo: "#DBEAFE" },
+  farmacia: { Icon: Cross, cor: "#DC2626", fundo: "#FEE2E2" },
+  transporte: { Icon: Car, cor: "#2563EB", fundo: "#DBEAFE" },
+  comida: { Icon: Utensils, cor: "#C2410C", fundo: "#FFEDD5" },
+  internet: { Icon: Wifi, cor: "#2563EB", fundo: "#DBEAFE" },
+  gas: { Icon: Flame, cor: "#C2410C", fundo: "#FFEDD5" },
+  celular: { Icon: Smartphone, cor: "#2563EB", fundo: "#DBEAFE" },
+  educacao: { Icon: GraduationCap, cor: "#7C3AED", fundo: "#EDE9FE" },
+  roupas: { Icon: Shirt, cor: "#7C3AED", fundo: "#EDE9FE" },
+  academia: { Icon: Dumbbell, cor: "#15803D", fundo: "#DCFCE7" },
+  saude: { Icon: HeartPulse, cor: "#DC2626", fundo: "#FEE2E2" },
+  presente: { Icon: Gift, cor: "#BE185D", fundo: "#FCE7F3" },
+  casa: { Icon: Home, cor: "#2563EB", fundo: "#DBEAFE" },
+  conta: { Icon: Wallet, cor: "#64748B", fundo: "#EEF2F7" },
+};
+
+function LogoLancamento({ texto, tipo = "compra", categoria = "" }) {
+  const dominio = dominioDaEmpresa(texto), marca = marcaDoLancamento(texto, tipo);
+  const logo = dominio ? null : LOGOS_LANCAMENTOS[marca];
+  const fonte = logo?.imagem || (dominio ? `https://icons.duckduckgo.com/ip3/${encodeURIComponent(dominio)}.ico` : null);
+  const [falhouUrl, setFalhouUrl] = useState(null), [carregadaUrl, setCarregadaUrl] = useState(null);
+  const falhou = fonte && (falhouUrl === fonte || (!logo && LOGOS_EXTERNAS_INDISPONIVEIS.has(fonte)));
+  const carregada = fonte && carregadaUrl === fonte && !falhou;
+  const { Icon, cor, fundo } = ICONES_LANCAMENTOS[categoriaIconeLancamento(texto, categoria, tipo)];
+  return <span className="relative shrink-0 rounded-full flex items-center justify-center overflow-hidden" style={{ width: 40, height: 40, background: fonte && !falhou ? logo?.fundo || "#FFFFFF" : fundo, border: `1px solid ${COR.linha}` }}>
+    {!carregada && <Icon size={19} color={cor} aria-hidden="true" />}
+    {fonte && !falhou && <img key={fonte} src={fonte} alt={`Logo ${logo?.nome || dominio}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setCarregadaUrl(fonte)} onError={() => { setFalhouUrl(fonte); if (!logo) LOGOS_EXTERNAS_INDISPONIVEIS.add(fonte); }} style={{ position: "absolute", width: 32, height: 32, objectFit: "contain", opacity: carregada ? 1 : 0 }} />}
   </span>;
 }
