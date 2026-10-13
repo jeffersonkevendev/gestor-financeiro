@@ -530,7 +530,10 @@ function MeuCaixaApp({ usuario }) {
     setAba(`cartao-${id}`);
     setNomeNovoCartao("");
     setMostrarAddCartao(false);
+    setMostrarListaCartoes(false);
   };
+
+  const fecharPopupCartoes = () => { setMostrarListaCartoes(false); setMostrarAddCartao(false); setNomeNovoCartao(""); };
 
   const excluirCartao = (id) => {
     if (aba === `cartao-${id}`) setAba("inicio");
@@ -717,7 +720,7 @@ function MeuCaixaApp({ usuario }) {
           {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
             { label: "Perfil", Icon: User, ativo: aba === "perfil", acao: () => setAba("perfil") },
-            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => setMostrarListaCartoes(true) },
+            { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => { setMostrarAddCartao(false); setNomeNovoCartao(""); setMostrarListaCartoes(true); } },
             { label: "Calculadora", Icon: IconeCalculadora, ativo: mostrarCalculadora, acao: () => setMostrarCalculadora(true) }
           ].map(({ label, Icon, ativo, acao }) => (
             <button key={label} aria-current={ativo ? "page" : undefined} onClick={acao} className="flex-1 min-w-0 flex flex-col items-center gap-1 px-1 py-2 rounded-xl text-[10px] sm:text-xs font-semibold" style={{ color: ativo ? COR.ouro : COR.tintaSuave }}>
@@ -727,28 +730,39 @@ function MeuCaixaApp({ usuario }) {
         </div>
       </nav>
       {mostrarListaCartoes && (
-        <div role="dialog" aria-modal="true" aria-label="Seus cartões" className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: "rgba(15,23,42,0.35)" }} onClick={() => setMostrarListaCartoes(false)}>
-          <div className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-3 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "80vh" }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center"><h2 className="text-lg font-bold">Seus cartões</h2><button aria-label="Fechar cartões" onClick={() => setMostrarListaCartoes(false)} className="p-2"><X size={20} /></button></div>
-            {cartoes.map((c) => <div key={c.id} className="flex items-center rounded-xl border" style={{ borderColor: COR.linha }}>
-              <button onClick={() => { setAba(`cartao-${c.id}`); setMostrarListaCartoes(false); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span><ChevronRight size={18} /></button>
-              <button type="button" aria-label={`Excluir ${c.nome}`} title={`Excluir ${c.nome}`} onClick={() => { setMostrarListaCartoes(false); setCartaoParaExcluir(c); }} className="p-3 shrink-0" style={{ color: COR.vermelho }}><Trash2 size={20} /></button>
-            </div>)}
-            {!cartoes.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado.</p>}
-            <button onClick={() => { setMostrarListaCartoes(false); setNomeNovoCartao(""); setMostrarAddCartao(true); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
-          </div>
-        </div>
-      )}
-
-      {mostrarAddCartao && (
-        <div role="dialog" aria-modal="true" aria-label="Adicionar cartão" className="fixed inset-0 z-50 flex items-center justify-center p-5 oculta-impressao" style={{ background: "rgba(15,23,42,0.35)" }} onClick={() => { setMostrarAddCartao(false); setNomeNovoCartao(""); }} onKeyDown={(e) => { if (e.key === "Escape") { setMostrarAddCartao(false); setNomeNovoCartao(""); } }}>
-          <div className="w-full max-w-sm rounded-2xl p-5 flex flex-col gap-4" style={{ background: COR.cartao }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Adicionar cartão</h2><button type="button" aria-label="Fechar cadastro de cartão" className="p-2" onClick={() => { setMostrarAddCartao(false); setNomeNovoCartao(""); }}><X size={20} /></button></div>
-            <Campo label="Nome do cartão"><input autoFocus value={nomeNovoCartao} onChange={(e) => setNomeNovoCartao(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") adicionarCartao(); }} placeholder="Ex: Cartão Inter" className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
-            <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => { setMostrarAddCartao(false); setNomeNovoCartao(""); }} className="px-4 py-3 rounded-xl text-sm font-semibold" style={{ color: COR.tintaSuave }}>Cancelar</button>
-              <button type="button" disabled={!nomeNovoCartao.trim()} onClick={adicionarCartao} className="px-4 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-40" style={{ background: COR.ouro }}>Adicionar</button>
+        <div role="dialog" aria-modal="true" aria-label="Seus cartões" className="fixed inset-0 z-50 flex items-center justify-center p-5 oculta-impressao" style={{ background: "rgba(15,23,42,0.35)" }} onClick={fecharPopupCartoes} onKeyDown={(e) => { if (e.key === "Escape") fecharPopupCartoes(); }}>
+          <style>{`
+            @keyframes cartao-form-entrar { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            .cartao-form-entrar { animation: cartao-form-entrar 240ms ease-out; }
+            @media (prefers-reduced-motion: reduce) { .cartao-form-entrar { animation: none; } }
+          `}</style>
+          <div className="w-full max-w-sm rounded-2xl p-5 overflow-hidden" style={{ background: COR.cartao, maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                {mostrarAddCartao && <button type="button" aria-label="Voltar à lista de cartões" onClick={() => { setMostrarAddCartao(false); setNomeNovoCartao(""); }} className="p-2 -ml-2"><ArrowLeft size={20} /></button>}
+                <h2 className="text-lg font-bold">Seus cartões</h2>
+              </div>
+              <button type="button" aria-label="Fechar cartões" onClick={fecharPopupCartoes} className="p-2"><X size={20} /></button>
             </div>
+            {mostrarAddCartao ? (
+              <form className="cartao-form-entrar flex flex-col gap-4" aria-label="Adicionar cartão" onSubmit={(e) => { e.preventDefault(); adicionarCartao(); }}>
+                <div><h3 className="text-base font-semibold" style={{ color: COR.ouro }}>Adicionar cartão</h3><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>Informe o nome do seu novo cartão.</p></div>
+                <Campo label="Nome do cartão"><input autoFocus required value={nomeNovoCartao} onChange={(e) => setNomeNovoCartao(e.target.value)} placeholder="Ex: Cartão Inter" className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={fecharPopupCartoes} className="px-4 py-3 rounded-xl text-sm font-semibold" style={{ color: COR.tintaSuave }}>Cancelar</button>
+                  <button type="submit" disabled={!nomeNovoCartao.trim()} className="px-4 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-40" style={{ background: COR.ouro }}>Adicionar</button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {cartoes.map((c) => <div key={c.id} className="flex items-center rounded-xl border" style={{ borderColor: COR.linha }}>
+                  <button type="button" onClick={() => { setAba(`cartao-${c.id}`); fecharPopupCartoes(); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span><ChevronRight size={18} /></button>
+                  <button type="button" aria-label={`Excluir ${c.nome}`} title={`Excluir ${c.nome}`} onClick={() => { fecharPopupCartoes(); setCartaoParaExcluir(c); }} className="p-3 shrink-0" style={{ color: COR.vermelho }}><Trash2 size={20} /></button>
+                </div>)}
+                {!cartoes.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado.</p>}
+                <button type="button" onClick={() => { setNomeNovoCartao(""); setMostrarAddCartao(true); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
+              </div>
+            )}
           </div>
         </div>
       )}
