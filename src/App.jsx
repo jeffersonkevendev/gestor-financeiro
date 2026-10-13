@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  Settings2, Search, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -436,7 +436,7 @@ const inputBase =
   "box-border h-10 px-2.5 rounded-2xl border bg-white outline-none text-sm focus:ring-2";
 
 // Botão de excluir com confirmação em duas etapas (evita apagar sem querer)
-function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14, descricao = "Excluir", aviso = "" }) {
+function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14, descricao = "Excluir", aviso = "", texto = "" }) {
   const [confirmando, setConfirmando] = useState(false);
   if (confirmando) {
     return (
@@ -452,7 +452,8 @@ function BotaoExcluirConfirmar({ onConfirmar, tamanho = 14, descricao = "Excluir
     );
   }
   return (
-    <button onClick={() => setConfirmando(true)} style={{ color: COR.vermelho }} title={descricao} aria-label={descricao}>
+    <button onClick={() => setConfirmando(true)} className="flex items-center gap-1" style={{ color: COR.vermelho }} title={descricao} aria-label={descricao}>
+      {texto && <span className="text-xs">{texto}</span>}
       <Trash2 size={tamanho} />
     </button>
   );
@@ -540,13 +541,21 @@ function MeuCaixaApp({ usuario }) {
   // ---------- cartões (dinâmicos) ----------
   const [mostrarAddCartao, setMostrarAddCartao] = useState(false);
   const [nomeNovoCartao, setNomeNovoCartao] = useState("");
+  const [diaNovoCartao, setDiaNovoCartao] = useState("");
+  const [cartaoConfigurando, setCartaoConfigurando] = useState(null);
+  const [ultimaExclusao, setUltimaExclusao] = useState(null);
 
   const adicionarCartao = () => {
     const nome = nomeNovoCartao.trim();
     if (!nome) return;
+    if (cartaoConfigurando) {
+      setCartoes((prev) => prev.map((c) => c.id === cartaoConfigurando.id ? { ...c, diaVencimento: diaNovoCartao ? Number(diaNovoCartao) : null } : c));
+      fecharPopupCartoes();
+      return;
+    }
     const id = uid();
     const paleta = corDoCartao(cartoes.length);
-    setCartoes((prev) => [...prev, { id, nome, cor: paleta.cor, corClara: paleta.corClara, compras: [] }]);
+    setCartoes((prev) => [...prev, { id, nome, cor: paleta.cor, corClara: paleta.corClara, diaVencimento: diaNovoCartao ? Number(diaNovoCartao) : diaVencimentoCartao({ nome }), compras: [] }]);
     setCartaoSelecionadoId(id);
     setAba(`cartao-${id}`);
     setNomeNovoCartao("");
@@ -554,9 +563,20 @@ function MeuCaixaApp({ usuario }) {
     setMostrarListaCartoes(false);
   };
 
-  const fecharPopupCartoes = () => { setCartaoOpcoesId(null); setMostrarListaCartoes(false); setMostrarAddCartao(false); setNomeNovoCartao(""); };
+  const fecharPopupCartoes = () => { setCartaoConfigurando(null); setDiaNovoCartao(""); setCartaoOpcoesId(null); setMostrarListaCartoes(false); setMostrarAddCartao(false); setNomeNovoCartao(""); };
+
+  const desfazerExclusao = () => {
+    if (!ultimaExclusao) return;
+    const { tipo, itens, cartaoId } = ultimaExclusao;
+    if (tipo === "cartao") setCartoes((prev) => restaurarRegistrosPorId(prev, itens));
+    if (tipo === "despesa") setDespesas((prev) => restaurarRegistrosPorId(prev, itens));
+    if (tipo === "compra") setCartoes((prev) => prev.map((c) => c.id === cartaoId ? { ...c, compras: restaurarRegistrosPorId(c.compras, itens) } : c));
+    setUltimaExclusao(null);
+  };
 
   const excluirCartao = (id) => {
+    const removido = cartoes.find((c) => c.id === id);
+    if (removido) setUltimaExclusao({ tipo: "cartao", itens: [removido], label: "Cartão excluído" });
     if (aba === `cartao-${id}`) setAba("inicio");
     setCartoes((prev) => prev.filter((c) => c.id !== id));
     setCartaoSelecionadoId((atual) => (atual === id ? null : atual));
@@ -710,6 +730,7 @@ function MeuCaixaApp({ usuario }) {
             <DespesasTab
               despesas={despesas}
               onAtualizarDespesas={setDespesas}
+              onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "despesa", itens, label: "Despesa excluída" })}
               cartoes={cartoes}
               pessoasAutomaticas={pessoasAutomaticas}
               pagamentosCartaoPagos={pagamentosCartaoPagos}
@@ -726,6 +747,7 @@ function MeuCaixaApp({ usuario }) {
                 onAtualizarCompras={(novasCompras) =>
                   setCartoes((prev) => prev.map((c) => (c.id === cartao.id ? { ...c, compras: novasCompras } : c)))
                 }
+                onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "compra", cartaoId: cartao.id, itens, label: itens.length > 1 ? "Compra e parcelas excluídas" : "Compra excluída" })}
                 onGerarPdf={gerarRelatorio}
                 gerandoImagem={gerandoImagem}
                 onPedirExclusao={() => setCartaoParaExcluir(cartao)}
@@ -766,12 +788,14 @@ function MeuCaixaApp({ usuario }) {
               <button type="button" aria-label="Fechar cartões" onClick={fecharPopupCartoes} className="p-2"><X size={20} /></button>
             </div>
             {mostrarAddCartao ? (
-              <form className="cartao-form-entrar flex flex-col gap-4" aria-label="Adicionar cartão" onSubmit={(e) => { e.preventDefault(); adicionarCartao(); }}>
-                <div><h3 className="text-base font-semibold" style={{ color: COR.ouro }}>Adicionar cartão</h3><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>Informe o nome do seu novo cartão.</p></div>
-                <Campo label="Nome do cartão"><input autoFocus required value={nomeNovoCartao} onChange={(e) => setNomeNovoCartao(e.target.value)} placeholder="Ex: Cartão Inter" className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
+              <form className="cartao-form-entrar flex flex-col gap-4" aria-label={cartaoConfigurando ? "Configurar cartão" : "Adicionar cartão"} onSubmit={(e) => { e.preventDefault(); adicionarCartao(); }}>
+                <div><h3 className="text-base font-semibold" style={{ color: COR.ouro }}>{cartaoConfigurando ? "Configurar cartão" : "Adicionar cartão"}</h3><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{cartaoConfigurando ? "Escolha o dia de vencimento." : "Informe o nome e o vencimento do seu cartão."}</p></div>
+                <Campo label="Nome do cartão"><input autoFocus required readOnly={!!cartaoConfigurando} value={nomeNovoCartao} onChange={(e) => setNomeNovoCartao(e.target.value)} placeholder="Ex: Cartão Inter" className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
+                <Campo label="Dia de vencimento"><select className={inputBase + " w-full"} value={diaNovoCartao} onChange={(e) => setDiaNovoCartao(e.target.value)} style={{ borderColor: COR.linha }}><option value="">{identificarBancoCartao({ nome: nomeNovoCartao }) === "nubank" ? "Dia 08 (padrão Nubank)" : "Não informado"}</option>{Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={String(i + 1)}>Dia {String(i + 1).padStart(2, "0")}</option>)}</select></Campo>
+                <p className="text-xs" style={{ color: COR.tintaSuave }}>Nos meses mais curtos, será usado o último dia do mês.</p>
                 <div className="flex gap-2 justify-end">
                   <button type="button" onClick={fecharPopupCartoes} className="px-4 py-3 rounded-xl text-sm font-semibold" style={{ color: COR.tintaSuave }}>Cancelar</button>
-                  <button type="submit" disabled={!nomeNovoCartao.trim()} className="px-4 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-40" style={{ background: COR.ouro }}>Adicionar</button>
+                  <button type="submit" disabled={!nomeNovoCartao.trim()} className="px-4 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-40" style={{ background: COR.ouro }}>{cartaoConfigurando ? "Salvar" : "Adicionar"}</button>
                 </div>
               </form>
             ) : (
@@ -781,17 +805,22 @@ function MeuCaixaApp({ usuario }) {
                     <button type="button" aria-label={`Abrir ${c.nome}`} onClick={() => { setAba(`cartao-${c.id}`); fecharPopupCartoes(); }} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-left"><IconeBanco cartao={c} /><span className="flex-1 break-words text-sm font-semibold">{c.nome}</span></button>
                     <button type="button" aria-label={`Opções de ${c.nome}`} aria-expanded={cartaoOpcoesId === c.id} onClick={() => setCartaoOpcoesId((atual) => atual === c.id ? null : c.id)} className="p-4 shrink-0" style={{ color: COR.tintaSuave }}><ChevronRight size={20} style={{ transform: cartaoOpcoesId === c.id ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 150ms" }} /></button>
                   </div>
-                  {cartaoOpcoesId === c.id && <div className="flex justify-end p-2" style={{ borderTop: `1px solid ${COR.linha}`, background: COR.papel }}>
+                  {cartaoOpcoesId === c.id && <div className="flex flex-wrap justify-end gap-2 p-2" style={{ borderTop: `1px solid ${COR.linha}`, background: COR.papel }}>
+                    <button type="button" aria-label={`Configurar ${c.nome}`} onClick={() => { setCartaoConfigurando(c); setNomeNovoCartao(c.nome); setDiaNovoCartao(String(diaVencimentoCartao(c) || "")); setMostrarAddCartao(true); setCartaoOpcoesId(null); }} className="flex items-center gap-2 p-2 rounded-lg text-sm font-semibold" style={{ color: COR.ouro }}><Settings2 size={18} />Vencimento</button>
                     <button type="button" aria-label={`Excluir ${c.nome}`} title={`Excluir ${c.nome}`} onClick={() => { fecharPopupCartoes(); setCartaoParaExcluir(c); }} className="flex items-center gap-2 p-2 rounded-lg text-sm font-semibold" style={{ color: COR.vermelho }}><Trash2 size={18} />Excluir cartão</button>
                   </div>}
                 </div>)}
                 {!cartoes.length && <p className="text-sm" style={{ color: COR.tintaSuave }}>Nenhum cartão cadastrado.</p>}
-                <button type="button" onClick={() => { setCartaoOpcoesId(null); setNomeNovoCartao(""); setMostrarAddCartao(true); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
+                <button type="button" onClick={() => { setCartaoConfigurando(null); setDiaNovoCartao(""); setCartaoOpcoesId(null); setNomeNovoCartao(""); setMostrarAddCartao(true); }} className="p-3 rounded-xl font-semibold text-white" style={{ background: COR.ouro }}><Plus size={18} className="inline mr-2" />Adicionar cartão</button>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {ultimaExclusao && <div role="status" aria-live="polite" className="fixed left-4 right-4 z-50 max-w-sm mx-auto rounded-2xl p-3 flex items-center gap-3 oculta-impressao" style={{ bottom: "calc(82px + env(safe-area-inset-bottom, 0px))", background: COR.tinta, color: "white", boxShadow: "0 8px 24px rgba(15,23,42,0.2)" }}>
+        <span className="flex-1 text-sm">{ultimaExclusao.label}</span><button onClick={desfazerExclusao} className="text-sm font-bold py-2" style={{ color: "#93C5FD" }}>Desfazer</button><button aria-label="Fechar aviso de exclusão" onClick={() => setUltimaExclusao(null)} className="p-1"><X size={16} /></button>
+      </div>}
 
       <Calculadora aberta={mostrarCalculadora} aoFechar={() => setMostrarCalculadora(false)} />
 
@@ -807,7 +836,7 @@ function MeuCaixaApp({ usuario }) {
               Excluir {cartaoParaExcluir.nome}?
             </p>
             <p className="text-sm mb-5" style={{ color: COR.tintaSuave }}>
-              Isso vai apagar permanentemente {cartaoParaExcluir.compras.length === 1 ? "a compra registrada" : "as compras registradas"} nesse cartão. Essa ação não pode ser desfeita.
+              Isso vai excluir {cartaoParaExcluir.compras.length === 1 ? "a compra registrada" : "as compras registradas"} nesse cartão. Você poderá desfazer pelo aviso exibido após a exclusão.
             </p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setCartaoParaExcluir(null)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
@@ -1023,6 +1052,39 @@ function PerfilTab({ usuario, onExportar, onSair, temPendencias, erroSaida }) {
   );
 }
 
+const normalizarBusca = (texto) => String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+function diaVencimentoCartao(cartao) {
+  const dia = Number(cartao.diaVencimento);
+  if (Number.isInteger(dia) && dia >= 1 && dia <= 31) return dia;
+  return identificarBancoCartao(cartao) === "nubank" ? 8 : null;
+}
+
+function dataVencimentoCartao(cartao, mes) {
+  const dia = diaVencimentoCartao(cartao);
+  if (!dia) return null;
+  const [ano, numero] = mes.split("-").map(Number);
+  const ultimoDia = new Date(ano, numero, 0).getDate();
+  return `${mes}-${String(Math.min(dia, ultimoDia)).padStart(2, "0")}`;
+}
+
+function criarDespesasMensais(base, quantidade) {
+  if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 120) throw new Error("Escolha de 1 a 120 meses para repetir a despesa.");
+  const [ano, mes, dia] = base.vencimento.split("-").map(Number);
+  const grupo = uid();
+  return Array.from({ length: quantidade }, (_, i) => {
+    const data = new Date(ano, mes - 1 + i, 1);
+    const ultimo = new Date(data.getFullYear(), data.getMonth() + 1, 0).getDate();
+    return { ...base, id: i === 0 ? base.id : uid(), paga: false, recorrenciaGrupoId: grupo,
+      vencimento: `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(Math.min(dia, ultimo)).padStart(2, "0")}` };
+  });
+}
+
+function restaurarRegistrosPorId(atuais, removidos) {
+  const ids = new Set(atuais.map((r) => r.id));
+  return [...atuais, ...removidos.filter((r) => !ids.has(r.id))];
+}
+
 // ===================== ABA INÍCIO =====================
 function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirCalculadora }) {
   const [mesAtual, setMesAtual] = useState(() => mesResumoInicial());
@@ -1129,10 +1191,13 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
 }
 
 // ===================== ABA DESPESAS =====================
-function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
+function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [filtro, setFiltro] = useState("Todas");
+  const [recorrente, setRecorrente] = useState(false);
+  const [quantidadeMeses, setQuantidadeMeses] = useState("12");
+  const [erroRecorrencia, setErroRecorrencia] = useState("");
   const [nova, setNova] = useState({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
@@ -1160,6 +1225,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
     label: c.nome,
     cor: c.cor,
     corClara: c.corClara,
+    diaVencimento: diaVencimentoCartao(c),
     totalPorMes: (chave) => totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas),
   })), [cartoesComAgrupamento, pessoasAutomaticas]);
 
@@ -1207,7 +1273,15 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
     const valor = valorMascaradoParaNumero(nova.valor);
     if (!nova.descricao.trim() || !nova.vencimento || !(valor > 0)) return;
     const novaDespesa = { id: uid(), descricao: nova.descricao.trim(), valor, vencimento: nova.vencimento, categoria: nova.categoria || "Outros", paga: false };
-    onAtualizarDespesas([...despesas, novaDespesa]);
+    setErroRecorrencia("");
+    let registros = [novaDespesa];
+    if (recorrente) {
+      try { registros = criarDespesasMensais(novaDespesa, Number(quantidadeMeses)); }
+      catch (erro) { setErroRecorrencia(erro.message); return; }
+    }
+    onAtualizarDespesas([...despesas, ...registros]);
+    setRecorrente(false);
+    setQuantidadeMeses("12");
     setNova({ descricao: "", valor: "", vencimento: "", categoria: CATEGORIAS[CATEGORIAS.length - 1] });
     setMostrarForm(false);
     setMesSelecionado(chaveDoMes(novaDespesa.vencimento));
@@ -1229,7 +1303,14 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
   };
 
   const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); };
-  const excluir = (id) => onAtualizarDespesas(despesas.filter((d) => d.id !== id));
+  const excluir = (id, proximas = false) => {
+    const alvo = despesas.find((d) => d.id === id);
+    if (!alvo) return;
+    const removidas = despesas.filter((d) => d.id === id || (proximas && alvo.recorrenciaGrupoId && d.recorrenciaGrupoId === alvo.recorrenciaGrupoId && d.vencimento >= alvo.vencimento));
+    const ids = new Set(removidas.map((d) => d.id));
+    onRegistrarExclusao?.(removidas);
+    onAtualizarDespesas(despesas.filter((d) => !ids.has(d.id)));
+  };
   const togglePaga = (id) => onAtualizarDespesas(despesas.map((d) => (d.id === id ? { ...d, paga: !d.paga } : d)));
 
   return (
@@ -1284,6 +1365,9 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
               onChange={(e) => setNova({ ...nova, vencimento: e.target.value })}
             />
           </Campo>
+          <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}><input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} style={{ accentColor: COR.ouro, minHeight: 16 }} />Repetir mensalmente</label>
+          {recorrente && <><Campo label="Quantidade de meses"><input type="number" min="1" max="120" step="1" value={quantidadeMeses} onChange={(e) => setQuantidadeMeses(e.target.value)} className={inputBase} style={{ borderColor: COR.linha }} /></Campo><p className="text-xs" style={{ color: COR.tintaSuave }}>Inclui o mês inicial. Será criada uma despesa por mês, com o mesmo valor e dia de vencimento.</p></>}
+          {erroRecorrencia && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroRecorrencia}</p>}
           <div className="flex gap-2 justify-end mt-1">
             <button onClick={() => setMostrarForm(false)} className="px-3 py-1.5 text-sm rounded-2xl" style={{ color: COR.tintaSuave }}>
               Cancelar
@@ -1345,7 +1429,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                     </button>
                     <div className="min-w-0 flex-1 pt-1">
                       <p className="text-base font-bold break-words" style={{ color: d.paga ? COR.tintaSuave : COR.tinta }}>{d.descricao}</p>
-                      <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</p>
+                      <p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{textoVencimento(d.vencimento)}</p>{d.recorrenciaGrupoId && <span className="inline-block rounded-full px-2 py-0.5 text-[10px] mt-1" style={{ background: COR.ouroClaro, color: COR.ouro }}>Mensal</span>}
                     </div>
                     <div className="flex flex-col items-end gap-2 pt-1 shrink-0">
                       <span className="fonte-mono text-base font-bold" style={{ color: COR.tinta }}>{fmt(d.valor)}</span>
@@ -1355,6 +1439,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                   <div className="flex justify-end items-center gap-4 mt-5">
                     <button onClick={() => iniciarEdicao(d)} className="p-1" aria-label={`Editar ${d.descricao}`} style={{ color: COR.tintaSuave }}><Pencil size={19} /></button>
                     <BotaoExcluirConfirmar tamanho={19} onConfirmar={() => excluir(d.id)} />
+                    {d.recorrenciaGrupoId && <BotaoExcluirConfirmar descricao="Excluir esta e próximas repetições" texto="Parar repetições" aviso="Esta e próximas" onConfirmar={() => excluir(d.id, true)} />}
                   </div>
                 </div>
               )}
@@ -1367,7 +1452,7 @@ function DespesasTab({ despesas, onAtualizarDespesas, cartoes, pessoasAutomatica
                 <button onClick={() => toggleCartaoPago(f.chavePagamento)} className="mt-1 shrink-0 p-1" aria-label={`${f.pago ? "Marcar como pendente" : "Marcar como paga"}: ${f.label}`} title={f.pago ? "Marcar como pendente" : "Marcar como paga"}>
                   {f.pago ? <CheckCircle2 size={26} color={COR.verde} /> : <Circle size={26} color="#A8B0BC" />}
                 </button>
-                <div className="min-w-0 flex-1 pt-1"><p className="text-base font-bold break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{f.id === "nubank" || /nu\s*bank/i.test(f.label) ? `Vence em 08/${mesSelecionado.slice(5, 7)}/${mesSelecionado.slice(0, 4)}` : "Fatura do cartão"}</p></div>
+                <div className="min-w-0 flex-1 pt-1"><p className="text-base font-bold break-words" style={{ color: COR.tinta }}>{f.label}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{dataVencimentoCartao(f, mesSelecionado) ? `Vence em ${dataVencimentoCartao(f, mesSelecionado).split("-").reverse().join("/")}` : "Fatura do cartão"}</p></div>
                 <div className="flex flex-col items-end gap-2 pt-1 shrink-0"><span className="fonte-mono text-base font-bold">{fmt(f.total)}</span><span className="rounded-full px-3 py-1 text-xs font-medium" style={{ background: f.pago ? COR.verdeClaro : "#FFEDD5", color: f.pago ? COR.verde : "#9A3412" }}>{f.pago ? "Paga" : "Pendente"}</span></div>
               </div>
             </div>
@@ -1574,7 +1659,7 @@ function OpcaoDividirCompra({ ativa, onAtiva, pessoa, onPessoa, nome, valor, neg
 }
 
 // ===================== ABA DE CARTÃO (reutilizada por todos os cartões) =====================
-function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas }) {
+function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPedirExclusao, pessoasAutomaticas, onRegistrarExclusao }) {
   const { nome: nomeCartao, cor: corPrincipal, corClara, compras } = cartao;
 
   // null seleciona todas as pessoas, inclusive novos nomes adicionados depois.
@@ -1612,6 +1697,7 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const [rascunho, setRascunho] = useState(null);
   const [erroEdicao, setErroEdicao] = useState("");
   const [erroExclusao, setErroExclusao] = useState("");
+  const [buscaCompra, setBuscaCompra] = useState("");
 
   const nomesUnicos = useMemo(() => {
     const nomes = new Map();
@@ -1632,10 +1718,10 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
     return inclui ? lista.filter((n) => n.toLocaleLowerCase("pt-BR") !== nome.toLocaleLowerCase("pt-BR")) : [...lista, nome];
   });
   const comprasFiltradas = useMemo(() => {
-    if (pessoasSelecionadas === null) return compras;
-    const nomes = new Set(pessoasSelecionadas.map((nome) => nome.toLocaleLowerCase("pt-BR")));
-    return compras.filter((c) => nomes.has(primeiroNomeDe(c.nome).toLocaleLowerCase("pt-BR")));
-  }, [compras, pessoasSelecionadas]);
+    const nomes = pessoasSelecionadas === null ? null : new Set(pessoasSelecionadas.map((nome) => nome.toLocaleLowerCase("pt-BR")));
+    const termo = normalizarBusca(buscaCompra);
+    return compras.filter((c) => (!nomes || nomes.has(primeiroNomeDe(c.nome).toLocaleLowerCase("pt-BR"))) && (!termo || normalizarBusca(`${c.compra} ${c.nome}`).includes(termo)));
+  }, [compras, pessoasSelecionadas, buscaCompra]);
 
   const comprasPorMes = useMemo(() => {
     const grupos = {};
@@ -1720,7 +1806,12 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
   const cancelarEdicao = () => { setEditandoId(null); setRascunho(null); setErroEdicao(""); };
   const excluir = (id) => {
     setErroExclusao("");
-    try { onAtualizarCompras(excluirCompraComParcelas(compras, id)); }
+    try {
+      const restantes = excluirCompraComParcelas(compras, id);
+      const ids = new Set(restantes.map((c) => c.id));
+      onRegistrarExclusao?.(compras.filter((c) => !ids.has(c.id)));
+      onAtualizarCompras(restantes);
+    }
     catch (erro) { setErroExclusao(erro.message); }
   };
 
@@ -1772,13 +1863,15 @@ function CartaoTab({ cartao, onAtualizarCompras, onGerarPdf, gerandoImagem, onPe
         </div>
       </div>
 
+      <div className="flex items-center gap-2 rounded-2xl border px-3 bg-white oculta-impressao" style={{ borderColor: COR.linha }}><Search size={18} color={COR.tintaSuave} /><input aria-label="Buscar compras" placeholder="Buscar compra ou pessoa" value={buscaCompra} onChange={(e) => setBuscaCompra(e.target.value)} className="flex-1 min-w-0 py-3 text-sm outline-none" />{buscaCompra && <button aria-label="Limpar busca" onClick={() => setBuscaCompra("")} className="p-2"><X size={16} /></button>}</div>
+
       <CarrosselMeses meses={meses} mesSelecionado={mesSelecionado} onSelecionar={setMesSelecionado} corAtiva={corPrincipal} />
 
       <div className="oculta-impressao">
         {mesSelecionado === mesResumoInicial() && <h2 className="text-base font-bold mb-2" style={{ color: COR.ouro }}>Fatura Atual</h2>}
         <div className="rounded-2xl px-5 py-4" style={{ background: corPrincipal }}>
           <p className="fonte-mono text-3xl font-bold text-white">{fmt(totalMes)}</p>
-          {(cartao.id === "nubank" || /nu\s*bank/i.test(nomeCartao)) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: 08 de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
+          {dataVencimentoCartao(cartao, mesSelecionado) && <p className="text-sm mt-2" style={{ color: "#FFFFFF" }}>Vencimento: {dataVencimentoCartao(cartao, mesSelecionado).slice(-2)} de {MESES[Number(mesSelecionado.slice(5, 7)) - 1]}</p>}
         </div>
       </div>
 
