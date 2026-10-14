@@ -1344,7 +1344,7 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
       </div>
 
       <button
-        onClick={() => setMostrarForm((v) => !v)}
+        onClick={() => setMostrarForm(true)}
         className="flex items-center justify-center gap-2 rounded-2xl h-14 text-base font-semibold transition-colors"
         style={{ background: COR.ouro, color: "white", boxShadow: "0 4px 12px rgba(37,99,235,0.18)" }}
       >
@@ -1353,11 +1353,13 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
 
       <div className="flex gap-2" aria-label="Filtrar despesas">{["Todas", "Pendentes", "Pagas"].map((f) => <button key={f} aria-pressed={filtro === f} onClick={() => setFiltro(f)} className="flex-1 h-11 rounded-full text-sm font-semibold" style={{ background: filtro === f ? COR.ouro : COR.papelEscuro, color: filtro === f ? "white" : COR.tintaSuave }}>{f}</button>)}</div>
       {mostrarForm && (
-        <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COR.cartao, border: `1px solid ${COR.linha}` }}>
+        <JanelaFerramentaCartao titulo="Adicionar despesa" onFechar={() => setMostrarForm(false)}>
+        <div className="flex flex-col gap-3">
           <Campo label="Descrição">
             <input
               className={inputBase}
               style={{ borderColor: COR.linha }}
+              autoFocus
               placeholder="Ex: Aluguel, luz, internet..."
               value={nova.descricao}
               onChange={(e) => setNova({ ...nova, descricao: e.target.value })}
@@ -1402,6 +1404,7 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
             </button>
           </div>
         </div>
+        </JanelaFerramentaCartao>
       )}
 
       {linhas.length === 0 && somaCartoes === 0 && !mostrarForm && (
