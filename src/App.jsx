@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
-  PawPrint, Pizza, Laptop, Basket, Settings2, Search, Mic, ShoppingCart, Filter, Image as IconeImagem, Car, Utensils, Cross, Wifi, Flame, Gift, Smartphone, GraduationCap, Shirt, Dumbbell, HeartPulse, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  PawPrint, Pizza, Laptop, ShoppingBasket, Settings2, Search, Mic, ShoppingCart, Filter, Image as IconeImagem, Car, Utensils, Cross, Wifi, Flame, Gift, Smartphone, GraduationCap, Shirt, Dumbbell, HeartPulse, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -2371,7 +2371,7 @@ function IconeCompraRelatorio({ texto }) {
   else if (/celular|telefone/.test(nome)) Icon = Smartphone;
   else if (/presente/.test(nome)) Icon = Gift;
   else if (/jim[.]?com|notebook|computador/.test(nome)) Icon = Laptop;
-  else if (/homemarket|supermercado/.test(nome)) Icon = Basket;
+  else if (/homemarket|supermercado/.test(nome)) Icon = ShoppingBasket;
   return <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, width: 46, height: 46, borderRadius: 13, background: "#EFE7FB", color: "#631299" }}><Icon size={29} strokeWidth={1.8} /></span>;
 }
 
