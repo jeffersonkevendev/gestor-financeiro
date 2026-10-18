@@ -6,5 +6,5 @@ import react from "@vitejs/plugin-react";
 // o base deve ser "/financas-app/".
 export default defineConfig({
   plugins: [react()],
-  base: "/gestor-financeiro/",
+  base: "/meu-caixa/",
 });
