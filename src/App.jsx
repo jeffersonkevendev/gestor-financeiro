@@ -2141,33 +2141,91 @@ function numeroFaladoPt(texto) {
   return total + parcial;
 }
 
-function interpretarCompraPorVoz(texto, nomeUsuario, mes = mesResumoInicial()) {
+function valorDaFala(texto) {
+  const dinheiro = normalizarBusca(texto).replace(/^r\$\s*/, "").trim();
+  const moedas = dinheiro.match(/^(.*?)\s+rea(?:l|is)(?:\s+e\s+(.*?)\s+centavos?)?$/);
+  if (moedas) {
+    const inteiro = numeroFaladoPt(moedas[1]), centavos = moedas[2] ? numeroFaladoPt(moedas[2]) : 0;
+    return Number.isInteger(inteiro) && Number.isInteger(centavos) && centavos >= 0 && centavos <= 99 ? inteiro + centavos / 100 : NaN;
+  }
+  const virgula = dinheiro.match(/^(.*?)\s+(?:virgula|ponto)\s+(.*?)$/);
+  if (virgula) {
+    const inteiro = numeroFaladoPt(virgula[1]), decimal = numeroFaladoPt(virgula[2]);
+    return Number.isInteger(inteiro) && Number.isInteger(decimal) && decimal >= 0 && decimal <= 99 ? inteiro + decimal / (/^(?:zero|0)\s/.test(virgula[2]) || decimal >= 10 ? 100 : 10) : NaN;
+  }
+  return dinheiro ? numeroFaladoPt(dinheiro) : NaN;
+}
+
+function montarCompraPorVoz({ compra, valor, mes, dividirCom = "", transcricao = "" }, nomeUsuario) {
   const nome = (nomeUsuario || "").trim();
-  if (!nome) throw new Error("Não foi possível identificar seu nome. Use o formulário de compra.");
+  if (!nome) throw new Error("Não foi possível identificar seu nome. Use Adicionar compra.");
+  if (!compra.trim()) throw new Error("Preencha a descrição da compra.");
+  if (!Number.isFinite(valor) || valor <= 0 || valor > 999999) throw new Error("Confira o valor da compra.");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) throw new Error("Escolha um mês válido.");
+  const registro = { id: uid(), nome, compra: compra.trim(), valor: Math.round(valor * 100) / 100, data: `${mes}-01`, tipoLancamento: "compra", origem: "voz", transcricaoVoz: transcricao };
+  const registros = dividirCom.trim() ? dividirRegistrosCompras([registro], nome, dividirCom.trim()) : [registro];
+  return { compra: registro.compra, valor: registro.valor, mes, dividirCom: dividirCom.trim(), registros };
+}
+
+function interpretarCompraPorVoz(texto, nomeUsuario, mes = mesResumoInicial()) {
   const original = texto.trim();
-  if (/parcelad|parcelas|estorno|pagamento antecipado/i.test(normalizarBusca(original))) throw new Error("Nesta versão, use a voz para compras à vista. Para parcelas ou estornos, use Adicionar compra.");
-  let fala = original.replace(/[.!?]+\s*$/g, "");
+  if (/parcelad|parcelas|estorno|pagamento antecipado/i.test(normalizarBusca(original))) throw new Error("Use Adicionar compra para parcelas, estornos ou pagamentos antecipados.");
+  let fala = original.replace(/[.!?;]+\s*$/g, "").trim();
+  const meses = "janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro".split(" ");
+  const mesFalado = normalizarBusca(fala).match(/(?:\s+(?:em|para|no|na|de))?\s+(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(?:\s+(?:de\s+)?(20\d{2}))?$/);
+  if (mesFalado) {
+    const numero = meses.indexOf(mesFalado[1]) + 1;
+    // Sem ano explícito, mantém o ano da fatura sugerida pelo aplicativo.
+    mes = `${mesFalado[2] || mes.slice(0, 4)}-${String(numero).padStart(2, "0")}`;
+    fala = fala.slice(0, mesFalado.index).trim();
+  }
   const divisao = fala.match(/\bdivid(?:ir|a|ida|indo)\s+(?:a\s+)?(?:compra\s+)?com\s+(.+)$/i);
   let dividirCom = "";
   if (divisao) { dividirCom = divisao[1].trim(); fala = fala.slice(0, divisao.index).trim().replace(/[.!?,;]+$/, ""); }
-  if (/\bdivid/i.test(fala) || (dividirCom && /\s+e\s+|[,;]/i.test(dividirCom))) throw new Error("Diga o nome de uma pessoa para dividir, por exemplo: dividir compra com Filipe.");
+  if (/\bdivid/i.test(fala) || (dividirCom && /\s+e\s+|[,;]/i.test(dividirCom))) throw new Error("Diga o nome de uma pessoa para dividir, por exemplo: dividir com Filipe.");
+  fala = fala.replace(/(?:[,;.]?\s+)?(?:hoje|ontem)\s*$/i, "").trim();
+  // Também permite o mês antes da indicação de divisão.
+  const mesAntesDivisao = normalizarBusca(fala).match(/(?:\s+(?:em|para|no|na|de))?\s+(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(?:\s+(?:de\s+)?(20\d{2}))?$/);
+  if (mesAntesDivisao) {
+    mes = `${mesAntesDivisao[2] || mes.slice(0, 4)}-${String(meses.indexOf(mesAntesDivisao[1]) + 1).padStart(2, "0")}`;
+    fala = fala.slice(0, mesAntesDivisao.index).trim().replace(/[.!?,;]+$/, "");
+  }
   const partes = fala.match(/^(?:comprei|gastei|paguei|compra de)\s+(.*?)\s+(?:no|na|em|para|de)\s+(.+)$/i);
-  if (!partes) throw new Error("Diga: comprei 30 reais no McDonald's hoje. Dividir compra com Filipe.");
-  const dinheiro = normalizarBusca(partes[1]).replace(/^r\$\s*/, "").trim();
-  let valor;
-  const moedas = dinheiro.match(/^(.*?)\s+reai?s?(?:\s+e\s+(.*?)\s+centavos?)?$/);
-  if (moedas) { const inteiro = numeroFaladoPt(moedas[1]), centavos = moedas[2] ? numeroFaladoPt(moedas[2]) : 0; valor = inteiro + centavos / 100; if (centavos < 0 || centavos > 99) valor = NaN; }
-  else valor = numeroFaladoPt(dinheiro);
-  if (!(valor > 0) || !Number.isFinite(valor) || valor > 999999) throw new Error("Não entendi o valor. Diga, por exemplo, trinta reais ou trinta reais e cinquenta centavos.");
-  let compra = partes[2].replace(/(?:[,;.]?\s+)?(?:hoje|ontem)\s*[.!?]*$/i, "").trim().replace(/[.!?]+$/, "");
-  if (!compra || /\bamanha\b|\bdia\s+\d/i.test(normalizarBusca(compra))) throw new Error("Não entendi o nome da compra. Tente: comprei 30 reais no supermercado hoje.");
-  const registro = { id: uid(), nome, compra, valor: Math.round(valor * 100) / 100, data: `${mes}-01`, tipoLancamento: "compra", origem: "voz", transcricaoVoz: original };
-  const registros = dividirCom ? dividirRegistrosCompras([registro], nome, dividirCom) : [registro];
-  return { compra, valor: registro.valor, mes, dividirCom, registros };
+  let compra, dinheiro;
+  if (partes) { dinheiro = partes[1]; compra = partes[2]; }
+  else {
+    fala = fala.replace(/^(?:comprei|gastei|paguei|compra de)\s+/i, "");
+    const tokens = fala.split(/\s+/);
+    // Busca o valor ao final: "recarga Vivo 35,79" ou "mercado trinta reais".
+    for (let i = 1; i < tokens.length; i++) {
+      const candidato = tokens.slice(i).join(" ");
+      if (Number.isFinite(valorDaFala(candidato))) { compra = tokens.slice(0, i).join(" "); dinheiro = candidato; break; }
+    }
+    if (!compra) {
+      // Aceita valor no início, mantendo números no nome da loja.
+      for (let i = tokens.length - 1; i >= 1; i--) {
+        const candidato = tokens.slice(0, i).join(" ");
+        if (Number.isFinite(valorDaFala(candidato))) { dinheiro = candidato; compra = tokens.slice(i).join(" ").replace(/^(?:no|na|em)\s+/i, ""); break; }
+      }
+    }
+  }
+  if (!compra || !dinheiro) throw new Error("Diga a descrição e o valor, por exemplo: recarga Vivo 35 reais e 79 centavos novembro.");
+  compra = compra.replace(/[.!?,;]+$/, "").trim();
+  if (/\bamanha\b|\bdia\s+\d/i.test(normalizarBusca(compra))) throw new Error("Confira a data usando o campo Mês da prévia.");
+  let valor = valorDaFala(dinheiro), aviso = "";
+  // Um número sem separador pode ser reais ou centavos: apenas sugere, nunca grava automaticamente.
+  if (/^\d{4,6}$/.test(dinheiro.trim())) {
+    valor /= 100;
+    aviso = `A fala trouxe “${dinheiro.trim()}” sem separador. Sugeri ${fmt(valor)}; confira e corrija o valor antes de confirmar.`;
+  }
+  const resultado = montarCompraPorVoz({ compra, valor, mes, dividirCom, transcricao: original }, nomeUsuario);
+  return { ...resultado, aviso };
 }
 
 function CompraPorVoz({ nomeUsuario, cartao, onFechar, onAdicionar, onDesfazer }) {
   const [ouvindo, setOuvindo] = useState(false), [erro, setErro] = useState(""), [transcricao, setTranscricao] = useState(""), [resultado, setResultado] = useState(null), [desfeita, setDesfeita] = useState(false);
+  const [previa, setPrevia] = useState(null), [confirmando, setConfirmando] = useState(false);
+  const adicionadaRef = useRef(false);
   const reconhecimentoRef = useRef(null), canceladoRef = useRef(false), processadoRef = useRef(false), callbacksRef = useRef({ onAdicionar });
   callbacksRef.current = { onAdicionar };
   const suportado = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -2180,6 +2238,7 @@ function CompraPorVoz({ nomeUsuario, cartao, onFechar, onAdicionar, onDesfazer }
   const fechar = () => { cancelarAudio(); onFechar(); };
   const iniciar = () => {
     if (!suportado || ouvindo || resultado) return;
+    setPrevia(null);
     canceladoRef.current = false; processadoRef.current = false; setErro(""); setTranscricao("");
     const Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
     const reconhecimento = new Reconhecimento(); reconhecimentoRef.current = reconhecimento;
@@ -2192,8 +2251,7 @@ function CompraPorVoz({ nomeUsuario, cartao, onFechar, onAdicionar, onDesfazer }
       setTranscricao(texto);
       try {
         const interpretado = interpretarCompraPorVoz(texto, nomeUsuario);
-        callbacksRef.current.onAdicionar(interpretado.registros, interpretado.mes);
-        setResultado(interpretado);
+        setPrevia({ compra: interpretado.compra, valor: interpretado.valor.toFixed(2).replace(".", ","), mes: interpretado.mes, dividirCom: interpretado.dividirCom, aviso: interpretado.aviso });
       } catch (e) { setErro(e.message); }
       setOuvindo(false);
     };
@@ -2205,14 +2263,37 @@ function CompraPorVoz({ nomeUsuario, cartao, onFechar, onAdicionar, onDesfazer }
     reconhecimento.onend = () => { if (!canceladoRef.current) setOuvindo(false); };
     try { setOuvindo(true); reconhecimento.start(); } catch { setOuvindo(false); setErro("Não foi possível iniciar o microfone. Tente novamente."); }
   };
+  const confirmar = () => {
+    if (!previa || adicionadaRef.current) return;
+    setErro("");
+    try {
+      const valor = valorDaFala(previa.valor);
+      const confirmado = montarCompraPorVoz({ ...previa, valor, transcricao }, nomeUsuario);
+      adicionadaRef.current = true;
+      setConfirmando(true);
+      callbacksRef.current.onAdicionar(confirmado.registros, confirmado.mes);
+      setResultado(confirmado);
+      setPrevia(null);
+    } catch (e) { adicionadaRef.current = false; setErro(e.message); }
+    finally { setConfirmando(false); }
+  };
   return createPortal(<div role="dialog" aria-modal="true" aria-label="Compra por voz" className="fixed inset-0 z-[70] flex items-center justify-center p-4 oculta-impressao" style={{ background: "rgba(15,23,42,0.4)" }} onClick={fechar}>
     <div className="w-full max-w-md rounded-3xl p-5 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "85dvh" }} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Compra por voz</h2><button type="button" aria-label="Fechar compra por voz" onClick={fechar} className="p-2"><X size={22} /></button></div>
       <div className="flex justify-center my-5"><button type="button" aria-label={ouvindo ? "Cancelar gravação" : "Iniciar gravação"} disabled={!suportado || !!resultado} onClick={ouvindo ? cancelarAudio : iniciar} className="rounded-full flex items-center justify-center disabled:opacity-50" style={{ width: 76, height: 76, background: COR.ouro, color: "white", boxShadow: "0 0 0 10px #DBEAFE" }}><Mic size={32} /></button></div>
-      <p role="status" aria-live="polite" className="text-sm text-center mb-3" style={{ color: resultado && !desfeita ? COR.verde : COR.tintaSuave }}>{desfeita ? "Compra desfeita." : resultado ? "Compra adicionada à fatura atual." : ouvindo ? "Ouvindo... fale a compra e aguarde." : "Toque no microfone para falar."}</p>
+      <p role="status" aria-live="polite" className="text-sm text-center mb-3" style={{ color: resultado && !desfeita ? COR.verde : COR.tintaSuave }}>{desfeita ? "Compra desfeita." : resultado ? "Compra adicionada ao mês escolhido." : previa ? "Confira os dados antes de adicionar." : ouvindo ? "Ouvindo... fale a compra e aguarde." : "Toque no microfone para falar."}</p>
       {!suportado && <p className="text-sm mb-3" style={{ color: COR.vermelho }}>Seu navegador não oferece reconhecimento de voz. Tente abrir o app no Chrome ou use Adicionar compra.</p>}
       {transcricao && <p className="text-sm rounded-xl p-3 mt-3" style={{ background: COR.papel }}>“{transcricao}”</p>}
       {erro && <p role="alert" className="text-sm mt-3" style={{ color: COR.vermelho }}>{erro} Nenhuma compra foi adicionada.</p>}
+      {previa && !resultado && <div className="mt-4 flex flex-col gap-3">
+        {previa.aviso && <p role="status" className="text-sm rounded-xl p-3" style={{ background: COR.ouroClaro, color: COR.tinta }}>{previa.aviso}</p>}
+        <label className="text-sm">Descrição<input value={previa.compra} onChange={(e) => setPrevia((p) => ({ ...p, compra: e.target.value }))} className="block w-full mt-1 rounded-xl border p-3" style={{ borderColor: COR.linha }} /></label>
+        <label className="text-sm">Valor (R$)<input inputMode="decimal" value={previa.valor} onChange={(e) => setPrevia((p) => ({ ...p, valor: e.target.value }))} className="block w-full mt-1 rounded-xl border p-3" style={{ borderColor: COR.linha }} /></label>
+        <label className="text-sm">Mês<input type="month" value={previa.mes} onChange={(e) => setPrevia((p) => ({ ...p, mes: e.target.value }))} className="block w-full mt-1 rounded-xl border p-3" style={{ borderColor: COR.linha }} /></label>
+        <label className="text-sm">Dividir com (opcional)<input value={previa.dividirCom} placeholder="Nome de uma pessoa" onChange={(e) => setPrevia((p) => ({ ...p, dividirCom: e.target.value }))} className="block w-full mt-1 rounded-xl border p-3" style={{ borderColor: COR.linha }} /></label>
+        <p className="text-xs" style={{ color: COR.tintaSuave }}>Se informar outra pessoa, o valor será dividido em partes iguais.</p>
+        <button type="button" disabled={confirmando} onClick={confirmar} className="rounded-xl px-4 py-3 text-sm font-semibold text-white disabled:opacity-50" style={{ background: COR.ouro }}>Confirmar e adicionar</button>
+      </div>}
       {resultado && <div className="mt-4"><p className="text-sm font-semibold">{resultado.compra} · {fmt(resultado.valor)}</p><p className="text-xs mt-1 mb-2" style={{ color: COR.tintaSuave }}>Fatura: {rotuloDoMes(resultado.mes)}</p>{resultado.registros.map((c) => <div key={c.id} className="flex justify-between rounded-xl border px-3 py-2 mt-2 text-sm" style={{ borderColor: COR.linha }}><span>{c.nome}</span><span>{fmt(c.valor)}</span></div>)}{resultado.dividirCom && <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Divisão em partes iguais. Um centavo de diferença, quando necessário, fica na sua parte.</p>}</div>}
       <div className="flex justify-end gap-3 mt-5">{resultado && !desfeita && <button type="button" onClick={() => { onDesfazer(resultado.registros.map((c) => c.id)); setDesfeita(true); }} className="rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: COR.ouroClaro, color: COR.ouro }}>Desfazer</button>}<button type="button" onClick={fechar} className="rounded-xl px-4 py-3 text-sm font-semibold text-white" style={{ background: COR.ouro }}>{resultado ? "Concluir" : "Cancelar"}</button></div>
       {!resultado && <p className="text-xs mt-3" style={{ color: COR.tintaSuave }}>O navegador pode usar um serviço online para reconhecer sua voz.</p>}
