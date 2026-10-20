@@ -140,8 +140,20 @@ const primeiroNomeDe = (nome) => (nome || "").trim().split(/\s+/)[0] || "";
 const ehPessoaAutomatica = (nome, lista) =>
   lista.some((p) => p.trim().toLowerCase() === (nome || "").trim().toLowerCase());
 
-const totalAutomaticoEmMes = (comprasPorMesObj, chave, pessoas) =>
-  (comprasPorMesObj[chave] || []).filter((c) => ehPessoaAutomatica(c.nome, pessoas)).reduce((s, c) => s + c.valor, 0);
+// A fatura familiar do Nubank de Jefferson inclui os lançamentos já registrados
+// para Jefferson e Filipe. Outras contas, bancos e pessoas mantêm a regra anterior.
+function pessoasAutomaticasDoCartao(cartao, pessoas) {
+  const primeiro = (nome) => String(nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().split(/\s+/)[0];
+  if (!cartao || identificarBancoCartao(cartao) !== "nubank" || !pessoas.some((p) => primeiro(p) === "jefferson")) return pessoas;
+  const familia = new Set(["jefferson", "filipe"]);
+  const nomes = (cartao.compras || []).filter((c) => familia.has(primeiro(c.nome))).map((c) => c.nome);
+  return [...new Set([...pessoas, "Jefferson", "Filipe", ...nomes])];
+}
+
+const totalAutomaticoEmMes = (comprasPorMesObj, chave, pessoas, cartao) => {
+  const incluidos = pessoasAutomaticasDoCartao(cartao, pessoas);
+  return (comprasPorMesObj[chave] || []).filter((c) => ehPessoaAutomatica(c.nome, incluidos)).reduce((s, c) => s + c.valor, 0);
+};
 
 const hojeISO = () => new Date().toISOString().slice(0, 10);
 
@@ -1105,7 +1117,7 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
       const chave = chaveDoMes(compra.data);
       (porMes[chave] ||= []).push(compra);
     }
-    return { ...c, totalMes: totalAutomaticoEmMes(porMes, mesAtual, pessoasAutomaticas) };
+    return { ...c, totalMes: totalAutomaticoEmMes(porMes, mesAtual, pessoasAutomaticas, c) };
   }), [cartoes, mesAtual, pessoasAutomaticas]);
 
   const somaCartoesMes = cartoesComTotal.reduce((s, c) => s + c.totalMes, 0);
@@ -1224,14 +1236,14 @@ function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, carto
     cor: c.cor,
     corClara: c.corClara,
     diaVencimento: diaVencimentoCartao(c),
-    totalPorMes: (chave) => totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas),
+    totalPorMes: (chave) => totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas, c),
   })), [cartoesComAgrupamento, pessoasAutomaticas]);
 
   const chaves = useMemo(() => {
     const conjunto = new Set(Object.keys(despesasPorMes));
     for (const c of cartoesComAgrupamento) {
       for (const chave of Object.keys(c.porMes)) {
-        if (totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas) > 0) conjunto.add(chave);
+        if (totalAutomaticoEmMes(c.porMes, chave, pessoasAutomaticas, c) > 0) conjunto.add(chave);
       }
     }
     return [...conjunto].sort();
@@ -2009,7 +2021,7 @@ function CartaoTab({ cartao, ativo, ferramentasHabilitadas, onAbrirCalculadora, 
                     </div>
                     <div className="flex flex-col items-end gap-2 max-w-[45%] text-right">
                       <span className="fonte-mono text-sm font-normal whitespace-nowrap">{valorVisivel(c.valor)}</span>
-                      <div className="flex flex-col items-end gap-1 max-w-full">{c.partesExibicao.map((parte) => <span key={parte.id} className="text-xs font-normal px-3 py-1 rounded-full break-words max-w-full" style={{ background: ehPessoaAutomatica(parte.nome, pessoasAutomaticas) ? corClara : COR.papelEscuro, color: ehPessoaAutomatica(parte.nome, pessoasAutomaticas) ? corPrincipal : COR.tintaSuave }}>{parte.nome}</span>)}</div>
+                      <div className="flex flex-col items-end gap-1 max-w-full">{c.partesExibicao.map((parte) => <span key={parte.id} className="text-xs font-normal px-3 py-1 rounded-full break-words max-w-full" style={{ background: ehPessoaAutomatica(parte.nome, pessoasAutomaticasDoCartao(cartao, pessoasAutomaticas)) ? corClara : COR.papelEscuro, color: ehPessoaAutomatica(parte.nome, pessoasAutomaticasDoCartao(cartao, pessoasAutomaticas)) ? corPrincipal : COR.tintaSuave }}>{parte.nome}</span>)}</div>
                     </div>
                   </div>
                 </div>
@@ -2042,7 +2054,7 @@ function dadosEvolucaoMensal(despesas, cartoes, pessoasAutomaticas, cartaoId) {
     const grupos = {};
     for (const compra of c.compras || []) (grupos[chaveDoMes(compra.data)] ||= []).push(compra);
     for (const mes of Object.keys(grupos)) {
-      const total = totalAutomaticoEmMes(grupos, mes, pessoasAutomaticas);
+      const total = totalAutomaticoEmMes(grupos, mes, pessoasAutomaticas, c);
       todasFaturas[mes] = (todasFaturas[mes] || 0) + total;
       if (!cartaoId || c.id === cartaoId) faturas[mes] = (faturas[mes] || 0) + total;
     }
