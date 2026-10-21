@@ -1154,15 +1154,13 @@ function InicioTab({ receitas = [], onAbrirEntradas, despesas, cartoes, pessoasA
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" aria-label="Ver entradas do mês" onClick={() => onAbrirEntradas(mesAtual)} className="text-left rounded-2xl border p-4 min-w-0" style={{ background: COR.cartao, borderColor: COR.linha }}>
-          <div className="flex items-center gap-2 text-sm" style={{ color: COR.verde }}><ArrowDownCircle size={18} />Entradas</div>
-          <p className="fonte-mono text-lg font-semibold mt-2 break-words" style={{ color: COR.verde }}>{valorVisivel(totalEntradas)}</p>
-          <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Salários e recebimentos <ChevronRight size={12} className="inline" /></p>
+        <button type="button" aria-label="Ver entradas do mês" onClick={() => onAbrirEntradas(mesAtual)} className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+          <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#2DB978" }}><ArrowDownCircle size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
+          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Entradas</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalEntradas)}</p></div>
         </button>
-        <div aria-label="Saldo do mês" className="rounded-2xl border p-4 min-w-0" style={{ background: saldoMes < 0 ? "#FEF2F2" : COR.verdeClaro, borderColor: COR.linha }}>
-          <p className="text-sm" style={{ color: COR.tintaSuave }}>Saldo do mês</p>
-          <p className="fonte-mono text-lg font-semibold mt-2 break-words" style={{ color: saldoMes < 0 ? COR.vermelho : COR.verde }}>{valorVisivel(saldoMes)}</p>
-          <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Entradas − despesas</p>
+        <div aria-label="Saldo do mês" className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+          <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: COR.ouro }}><Wallet size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
+          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Saldo</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(saldoMes)}</p></div>
         </div>
       </div>
       <div>
