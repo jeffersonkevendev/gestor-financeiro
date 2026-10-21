@@ -1146,21 +1146,21 @@ function InicioTab({ receitas = [], onAbrirEntradas, despesas, cartoes, pessoasA
       <div className="grid grid-cols-2 gap-3">
         <button type="button" aria-label="Ver despesas pagas" onClick={() => onAbrirDespesas("Pagas", mesAtual)} className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#2DB978" }}><Check size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pago</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalPagoMes)}</p></div>
+          <div className="min-w-0 flex-1"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pago</p><p className="fonte-mono font-bold mt-1 whitespace-nowrap" style={{ fontSize: "clamp(10px, 3.1vw, 14px)", letterSpacing: "-0.025em" }}>{valorVisivel(totalPagoMes)}</p></div>
         </button>
         <button type="button" aria-label="Ver despesas pendentes" onClick={() => onAbrirDespesas("Pendentes", mesAtual)} className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#F5A623" }}><Clock size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pendente</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalGeralMes - totalPagoMes)}</p></div>
+          <div className="min-w-0 flex-1"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pendente</p><p className="fonte-mono font-bold mt-1 whitespace-nowrap" style={{ fontSize: "clamp(10px, 3.1vw, 14px)", letterSpacing: "-0.025em" }}>{valorVisivel(totalGeralMes - totalPagoMes)}</p></div>
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <button type="button" aria-label="Ver entradas do mês" onClick={() => onAbrirEntradas(mesAtual)} className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#2DB978" }}><ArrowDownCircle size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Entradas</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalEntradas)}</p></div>
+          <div className="min-w-0 flex-1"><p className="text-sm" style={{ color: COR.tintaSuave }}>Entradas</p><p className="fonte-mono font-bold mt-1 whitespace-nowrap" style={{ fontSize: "clamp(10px, 3.1vw, 14px)", letterSpacing: "-0.025em" }}>{valorVisivel(totalEntradas)}</p></div>
         </button>
         <div aria-label="Saldo do mês" className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: COR.ouro }}><Wallet size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
-          <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Saldo</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(saldoMes)}</p></div>
+          <div className="min-w-0 flex-1"><p className="text-sm" style={{ color: COR.tintaSuave }}>Saldo</p><p className="fonte-mono font-bold mt-1 whitespace-nowrap" style={{ fontSize: "clamp(10px, 3.1vw, 14px)", letterSpacing: "-0.025em" }}>{valorVisivel(saldoMes)}</p></div>
         </div>
       </div>
       <div>
