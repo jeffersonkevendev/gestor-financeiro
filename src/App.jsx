@@ -488,6 +488,8 @@ export default function App() {
 }
 
 function MeuCaixaApp({ usuario }) {
+  const [atalhoDespesas, setAtalhoDespesas] = useState(null);
+  const [atalhoEntradas, setAtalhoEntradas] = useState(null);
   const [aba, setAba] = useLocalStorageState("meu-caixa:aba-ativa", "inicio");
   const [erroSaida, setErroSaida] = useState("");
   const { despesas, setDespesas, receitas, setReceitas, cartoes, setCartoes, pagamentosCartaoPagos, setPagamentosCartaoPagos, orcamentoMensal, setOrcamentoMensal, carregando, salvando, temPendencias, erroNuvem, tentarNovamente } = useDadosNuvem(usuario.uid);
@@ -495,8 +497,6 @@ function MeuCaixaApp({ usuario }) {
   const [cartaoOpcoesId, setCartaoOpcoesId] = useState(null);
   const [mostrarCalculadora, setMostrarCalculadora] = useState(false);
   const [cartaoSelecionadoId, setCartaoSelecionadoId] = useLocalStorageState(`meu-caixa:${usuario.uid}:cartao-selecionado`, null);
-  const [mostrarNovaReceita, setMostrarNovaReceita] = useState(false);
-  const [receitaEditando, setReceitaEditando] = useState(null);
   const [mostrarOrcamento, setMostrarOrcamento] = useState(false);
 
   // A soma automática nos cartões usa o nome de quem está logado — sem precisar configurar nada.
@@ -510,7 +510,7 @@ function MeuCaixaApp({ usuario }) {
   }, [nomeDoUsuario, primeiroNomeDoUsuario]);
 
   // ---------- navegação (abas deslizáveis) ----------
-  const abas = ["inicio", "despesas", "perfil", "graficos", ...cartoes.map((c) => `cartao-${c.id}`)];
+  const abas = ["inicio", "despesas", "perfil", "graficos", "entradas", ...cartoes.map((c) => `cartao-${c.id}`)];
   const indiceAbaBruto = abas.indexOf(aba);
   const indiceAba = indiceAbaBruto === -1 ? 0 : indiceAbaBruto;
 
@@ -582,6 +582,7 @@ function MeuCaixaApp({ usuario }) {
     if (!ultimaExclusao) return;
     const { tipo, itens, cartaoId } = ultimaExclusao;
     if (tipo === "cartao") setCartoes((prev) => restaurarRegistrosPorId(prev, itens));
+    if (tipo === "receita") setReceitas((prev) => restaurarRegistrosPorId(prev, itens));
     if (tipo === "despesa") setDespesas((prev) => restaurarRegistrosPorId(prev, itens));
     if (tipo === "compra") setCartoes((prev) => prev.map((c) => c.id === cartaoId ? { ...c, compras: restaurarRegistrosPorId(c.compras, itens) } : c));
     setUltimaExclusao(null);
@@ -604,7 +605,7 @@ function MeuCaixaApp({ usuario }) {
 
   // ---------- exportar dados ----------
   const exportarDados = () => {
-    const payload = { despesas, cartoes, pessoasAutomaticas, exportadoEm: new Date().toISOString() };
+    const payload = { despesas, receitas, cartoes, pagamentosCartaoPagos, orcamentoMensal, pessoasAutomaticas, exportadoEm: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -648,20 +649,8 @@ function MeuCaixaApp({ usuario }) {
   };
 
   const cartaoAtivo = cartoes.find((c) => `cartao-${c.id}` === aba);
-  const acento = aba === "despesas" || aba === "inicio" || aba === "perfil" || aba === "graficos" ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
-  const acentoClaro = aba === "despesas" || aba === "inicio" || aba === "perfil" || aba === "graficos" ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
-
-  // ---------- receitas ----------
-  const adicionarOuAtualizarReceita = (dadosReceita) => {
-    if (dadosReceita.id) {
-      setReceitas((prev) => prev.map((r) => (r.id === dadosReceita.id ? dadosReceita : r)));
-    } else {
-      setReceitas((prev) => [...prev, { ...dadosReceita, id: uid() }]);
-    }
-    setMostrarNovaReceita(false);
-    setReceitaEditando(null);
-  };
-  const excluirReceita = (id) => setReceitas((prev) => prev.filter((r) => r.id !== id));
+  const acento = aba === "despesas" || aba === "inicio" || aba === "perfil" || (aba === "graficos" || aba === "entradas") ? COR.ouro : cartaoAtivo?.cor || COR.roxo;
+  const acentoClaro = aba === "despesas" || aba === "inicio" || aba === "perfil" || (aba === "graficos" || aba === "entradas") ? COR.ouroClaro : cartaoAtivo?.corClara || COR.roxoClaro;
 
   const sairDaConta = async () => {
     if (temPendencias) return;
@@ -739,17 +728,21 @@ function MeuCaixaApp({ usuario }) {
         >
           <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
             <InicioTab
+              receitas={receitas}
+              onAbrirEntradas={(mes) => { setAtalhoEntradas({ mes }); setAba("entradas"); setCartaoSelecionadoId(null); }}
               despesas={despesas}
               cartoes={cartoes}
               pessoasAutomaticas={pessoasAutomaticas}
               primeiroNome={primeiroNomeDoUsuario}
               pagamentosCartaoPagos={pagamentosCartaoPagos}
+              onAbrirDespesas={(filtro, mes) => { setAtalhoDespesas({ filtro, mes }); setAba("despesas"); setCartaoSelecionadoId(null); }}
               onIrPara={(destino) => { const cartao = cartoes.find((c) => destino === `cartao-${c.id}`); if (cartao) setCartaoSelecionadoId(cartao.id); setAba(destino); }}
               onAbrirCalculadora={() => setMostrarCalculadora(true)}
             />
           </div>
           <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
             <DespesasTab
+              atalho={atalhoDespesas}
               despesas={despesas}
               onAtualizarDespesas={setDespesas}
               onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "despesa", itens, label: "Despesa excluída" })}
@@ -763,6 +756,9 @@ function MeuCaixaApp({ usuario }) {
             <PerfilTab usuario={usuario} onExportar={exportarDados} onSair={sairDaConta} temPendencias={temPendencias} erroSaida={erroSaida} />
           </div>
           <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao"><GraficosTab despesas={despesas} cartoes={cartoes} pessoasAutomaticas={pessoasAutomaticas} onVoltar={() => setAba("inicio")} /></div>
+          <div className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0 oculta-impressao">
+            <EntradasTab receitas={receitas} onAtualizarReceitas={setReceitas} onRegistrarExclusao={(itens) => setUltimaExclusao({ tipo: "receita", itens, label: "Entrada excluída" })} nomeUsuario={primeiroNomeDoUsuario} atalho={atalhoEntradas} onVoltar={() => setAba("inicio")} />
+          </div>
           {cartoes.map((cartao) => (
             <div key={cartao.id} className="max-w-2xl mx-auto px-5 pt-6 pb-28 w-full shrink-0">
               <CartaoTab
@@ -788,7 +784,7 @@ function MeuCaixaApp({ usuario }) {
 
       <nav aria-label="Navegação principal" className="fixed bottom-0 left-0 right-0 z-40 oculta-impressao" style={{ background: COR.cartao, borderTop: `1px solid ${COR.linha}`, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="max-w-2xl mx-auto flex justify-around py-2">
-          {[{ label: "Início", Icon: Home, ativo: aba === "inicio", acao: () => setAba("inicio") },
+          {[{ label: "Início", Icon: Home, ativo: aba === "inicio" || aba === "entradas", acao: () => setAba("inicio") },
             { label: "Despesas", Icon: Wallet, ativo: aba === "despesas", acao: () => setAba("despesas") },
             { label: "Perfil", Icon: User, ativo: aba === "perfil", acao: () => setAba("perfil") },
             { label: "Cartões", Icon: CreditCard, ativo: aba.startsWith("cartao-"), acao: () => {
@@ -1092,7 +1088,7 @@ function restaurarRegistrosPorId(atuais, removidos) {
 }
 
 // ===================== ABA INÍCIO =====================
-function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirCalculadora }) {
+function InicioTab({ receitas = [], onAbrirEntradas, despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirDespesas, onAbrirCalculadora }) {
   const [ocultarValores, setOcultarValores] = useState(false);
   const valorVisivel = (valor) => ocultarValores ? "R$ ••••" : fmt(valor);
   const [mesAtual, setMesAtual] = useState(() => mesResumoInicial());
@@ -1120,8 +1116,10 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
     return { ...c, totalMes: totalAutomaticoEmMes(porMes, mesAtual, pessoasAutomaticas, c) };
   }), [cartoes, mesAtual, pessoasAutomaticas]);
 
+  const totalEntradas = totalEntradasDoMes(receitas, mesAtual);
   const somaCartoesMes = cartoesComTotal.reduce((s, c) => s + c.totalMes, 0);
   const totalGeralMes = totalDespesasReais + somaCartoesMes;
+  const saldoMes = Math.round((totalEntradas - totalGeralMes) * 100) / 100;
   const totalPagoMes = despesasMes.filter((d) => d.paga).reduce((s, d) => s + d.valor, 0)
     + cartoesComTotal.filter((c) => pagamentosCartaoPagos[`${c.id}-${mesAtual}`]).reduce((s, c) => s + c.totalMes, 0);
 
@@ -1146,13 +1144,25 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
       </button>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+        <button type="button" aria-label="Ver despesas pagas" onClick={() => onAbrirDespesas("Pagas", mesAtual)} className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#2DB978" }}><Check size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
           <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pago</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalPagoMes)}</p></div>
-        </div>
-        <div className="rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
+        </button>
+        <button type="button" aria-label="Ver despesas pendentes" onClick={() => onAbrirDespesas("Pendentes", mesAtual)} className="text-left rounded-2xl border p-3 sm:p-4 flex items-start gap-2 sm:gap-3" style={{ background: COR.cartao, borderColor: COR.linha, boxShadow: "0 3px 12px rgba(15,23,42,0.025)" }}>
           <span className="flex items-center justify-center rounded-full shrink-0 mt-0.5" style={{ width: 32, height: 32, background: "#F5A623" }}><Clock size={19} color="white" strokeWidth={2.5} aria-hidden="true" /></span>
           <div className="min-w-0"><p className="text-sm" style={{ color: COR.tintaSuave }}>Pendente</p><p className="fonte-mono font-bold text-sm sm:text-base mt-1">{valorVisivel(totalGeralMes - totalPagoMes)}</p></div>
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" aria-label="Ver entradas do mês" onClick={() => onAbrirEntradas(mesAtual)} className="text-left rounded-2xl border p-4 min-w-0" style={{ background: COR.cartao, borderColor: COR.linha }}>
+          <div className="flex items-center gap-2 text-sm" style={{ color: COR.verde }}><ArrowDownCircle size={18} />Entradas</div>
+          <p className="fonte-mono text-lg font-semibold mt-2 break-words" style={{ color: COR.verde }}>{valorVisivel(totalEntradas)}</p>
+          <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Salários e recebimentos <ChevronRight size={12} className="inline" /></p>
+        </button>
+        <div aria-label="Saldo do mês" className="rounded-2xl border p-4 min-w-0" style={{ background: saldoMes < 0 ? "#FEF2F2" : COR.verdeClaro, borderColor: COR.linha }}>
+          <p className="text-sm" style={{ color: COR.tintaSuave }}>Saldo do mês</p>
+          <p className="fonte-mono text-lg font-semibold mt-2 break-words" style={{ color: saldoMes < 0 ? COR.vermelho : COR.verde }}>{valorVisivel(saldoMes)}</p>
+          <p className="text-xs mt-2" style={{ color: COR.tintaSuave }}>Entradas − despesas</p>
         </div>
       </div>
       <div>
@@ -1200,10 +1210,74 @@ function InicioTab({ despesas, cartoes, pessoasAutomaticas, primeiroNome, pagame
 }
 
 // ===================== ABA DESPESAS =====================
-function DespesasTab({ despesas, onRegistrarExclusao, onAtualizarDespesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
+function totalEntradasDoMes(receitas, mes) {
+  return (receitas || []).filter((r) => chaveDoMes(r.data || r.vencimento) === mes)
+    .reduce((centavos, r) => centavos + (Number.isFinite(Number(r.valor)) ? Math.round(Number(r.valor) * 100) : 0), 0) / 100;
+}
+
+function EntradasTab({ receitas, onAtualizarReceitas, onRegistrarExclusao, onVoltar, nomeUsuario, atalho }) {
+  const [mesSelecionado, setMesSelecionado] = useState(mesResumoInicial());
+  const [rascunho, setRascunho] = useState(null), [erro, setErro] = useState("");
+  useEffect(() => { if (atalho) { setMesSelecionado(atalho.mes); setRascunho(null); setErro(""); } }, [atalho]);
+  useEffect(() => {
+    if (!rascunho) return;
+    const fechar = (e) => { if (e.key === "Escape") setRascunho(null); };
+    document.addEventListener("keydown", fechar);
+    return () => document.removeEventListener("keydown", fechar);
+  }, [!!rascunho]);
+  const meses = preencherIntervaloMeses([mesSelecionado, mesResumoInicial(), ...receitas.map((r) => chaveDoMes(r.data || r.vencimento)).filter(Boolean)]).reverse();
+  const entradas = receitas.filter((r) => chaveDoMes(r.data || r.vencimento) === mesSelecionado).slice().sort((a, b) => (a.data || a.vencimento || "").localeCompare(b.data || b.vencimento || ""));
+  const pessoas = [...new Set([nomeUsuario, "Jefferson", "Filipe", ...receitas.map((r) => r.pessoa)].filter(Boolean))];
+  const abrir = (entrada) => {
+    setErro("");
+    setRascunho(entrada ? { ...entrada, pessoa: entrada.pessoa || "", data: entrada.data || entrada.vencimento || `${mesSelecionado}-01`, valor: Number(entrada.valor).toFixed(2).replace(".", ",") } : { descricao: "", pessoa: nomeUsuario || "", valor: "", data: `${mesSelecionado}-01` });
+  };
+  const salvar = (evento) => {
+    evento.preventDefault();
+    const valor = valorMascaradoParaNumero(rascunho.valor), data = rascunho.data;
+    if (!rascunho.descricao.trim() || !rascunho.pessoa.trim()) { setErro("Preencha a descrição e o nome de quem recebeu."); return; }
+    if (!Number.isFinite(valor) || valor <= 0) { setErro("Informe um valor maior que zero."); return; }
+    if (!/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(data) || Number.isNaN(Date.parse(data)) || new Date(data).toISOString().slice(0, 10) !== data) { setErro("Escolha uma data válida."); return; }
+    const entrada = { ...rascunho, id: rascunho.id || uid(), descricao: rascunho.descricao.trim(), pessoa: rascunho.pessoa.trim(), valor: Math.round(valor * 100) / 100, data };
+    onAtualizarReceitas((anteriores) => rascunho.id ? anteriores.map((r) => r.id === rascunho.id ? entrada : r) : [...anteriores, entrada]);
+    setMesSelecionado(chaveDoMes(data)); setRascunho(null); setErro("");
+  };
+  const excluir = (entrada) => { onAtualizarReceitas((anteriores) => anteriores.filter((r) => r.id !== entrada.id)); onRegistrarExclusao([entrada]); };
+  const inputStyle = { borderColor: COR.linha, background: COR.cartao, color: COR.tinta };
+  return <section className="flex flex-col gap-5" aria-label="Entradas do mês">
+    <div className="flex items-center gap-3"><button type="button" aria-label="Voltar ao início" onClick={onVoltar} className="p-2 rounded-xl" style={{ color: COR.ouro }}><ArrowLeft size={22} /></button><h2 className="text-2xl font-semibold">Entradas</h2></div>
+    <label className="text-sm" style={{ color: COR.tintaSuave }}>Mês<select aria-label="Mês das entradas" value={mesSelecionado} onChange={(e) => setMesSelecionado(e.target.value)} className="block w-full rounded-xl border p-3 mt-1" style={inputStyle}>{meses.map((m) => <option key={m} value={m}>{rotuloDoMes(m)}</option>)}</select></label>
+    <div className="rounded-2xl p-5" style={{ background: COR.verdeClaro }}><p className="text-sm" style={{ color: COR.verde }}>Total de entradas</p><p className="fonte-mono text-2xl font-semibold mt-1" style={{ color: COR.verde }}>{fmt(totalEntradasDoMes(receitas, mesSelecionado))}</p></div>
+    <button type="button" onClick={() => abrir(null)} className="flex items-center justify-center gap-2 rounded-xl p-3 text-sm text-white" style={{ background: COR.ouro }}><Plus size={18} />Adicionar entrada</button>
+    {entradas.length === 0 && <p className="text-sm py-6 text-center" style={{ color: COR.tintaSuave }}>Nenhuma entrada neste mês. Adicione salários ou outros recebimentos.</p>}
+    <div>{entradas.map((r) => <div key={r.id} className="flex items-center gap-3 py-4 border-b" style={{ borderColor: COR.linha }}>
+      <span className="rounded-full p-2 shrink-0" style={{ background: COR.verdeClaro, color: COR.verde }}><ArrowDownCircle size={20} /></span>
+      <div className="min-w-0 flex-1"><p className="text-sm break-words">{r.descricao}</p><p className="text-xs mt-1" style={{ color: COR.tintaSuave }}>{r.pessoa || "Sem pessoa informada"} · {(r.data || r.vencimento || "").split("-").reverse().join("/")}</p></div>
+      <div className="shrink-0 text-right"><p className="fonte-mono text-sm" style={{ color: COR.verde }}>{fmt(Number(r.valor))}</p><div className="flex gap-3 justify-end mt-2"><button type="button" aria-label={`Editar entrada ${r.descricao}`} onClick={() => abrir(r)} style={{ color: COR.tintaSuave }}><Pencil size={16} /></button><BotaoExcluirConfirmar onConfirmar={() => excluir(r)} /></div></div>
+    </div>)}</div>
+    {rascunho && createPortal(<div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={rascunho.id ? "Editar entrada" : "Adicionar entrada"} style={{ background: "rgba(15,23,42,0.35)" }} onClick={() => setRascunho(null)} onTouchStart={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()}>
+      <form onSubmit={salvar} onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl p-5 flex flex-col gap-4 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "85dvh" }}>
+        <div className="flex justify-between items-center"><h3 className="text-lg font-semibold">{rascunho.id ? "Editar entrada" : "Adicionar entrada"}</h3><button type="button" aria-label="Fechar entrada" onClick={() => setRascunho(null)}><X size={22} /></button></div>
+        <label className="text-sm">Descrição<input autoFocus required placeholder="Salário, renda extra..." value={rascunho.descricao} onChange={(e) => setRascunho((r) => ({ ...r, descricao: e.target.value }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /></label>
+        <label className="text-sm">Quem recebeu<input required list="pessoas-entradas" placeholder="Jefferson, Filipe..." value={rascunho.pessoa} onChange={(e) => setRascunho((r) => ({ ...r, pessoa: e.target.value }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /><datalist id="pessoas-entradas">{pessoas.map((p) => <option key={p} value={p} />)}</datalist></label>
+        <label className="text-sm">Valor (R$)<input required inputMode="decimal" placeholder="0,00" value={rascunho.valor} onChange={(e) => setRascunho((r) => ({ ...r, valor: formatarValorDigitado(e.target.value) }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /></label>
+        <label className="text-sm">Data do recebimento<input required type="date" value={rascunho.data} onChange={(e) => setRascunho((r) => ({ ...r, data: e.target.value }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /></label>
+        {erro && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erro}</p>}
+        <div className="flex gap-3"><button type="button" onClick={() => setRascunho(null)} className="flex-1 rounded-xl p-3 text-sm" style={{ background: COR.papelEscuro }}>Cancelar</button><button type="submit" className="flex-1 rounded-xl p-3 text-sm text-white" style={{ background: COR.ouro }}>Salvar entrada</button></div>
+      </form>
+    </div>, document.body)}
+  </section>;
+}
+
+function DespesasTab({ atalho, despesas, onRegistrarExclusao, onAtualizarDespesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAtualizarPagamentosCartao }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualChave());
   const [mostrarForm, setMostrarForm] = useState(false);
   const [filtro, setFiltro] = useState("Todas");
+  useEffect(() => {
+    if (!atalho) return;
+    setFiltro(atalho.filtro);
+    setMesSelecionado(atalho.mes);
+  }, [atalho]);
   const [recorrente, setRecorrente] = useState(false);
   const [quantidadeMeses, setQuantidadeMeses] = useState("12");
   const [erroRecorrencia, setErroRecorrencia] = useState("");
