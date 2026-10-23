@@ -1283,6 +1283,9 @@ function DespesasTab({ atalho, despesas, onRegistrarExclusao, onAtualizarDespesa
   const [editandoId, setEditandoId] = useState(null);
   const [rascunho, setRascunho] = useState(null);
   const [confirmarAcao, setConfirmarAcao] = useState(null);
+  const [repetirNaEdicao, setRepetirNaEdicao] = useState(false);
+  const [mesesNaEdicao, setMesesNaEdicao] = useState("12");
+  const [erroNaEdicao, setErroNaEdicao] = useState("");
 
   const despesasPorMes = useMemo(() => {
     const grupos = {};
@@ -1362,16 +1365,23 @@ function DespesasTab({ atalho, despesas, onRegistrarExclusao, onAtualizarDespesa
     setMesSelecionado(chaveDoMes(novaDespesa.vencimento));
   };
 
-  const iniciarEdicao = (d) => { setConfirmarAcao(null); setEditandoId(d.id); setRascunho({ ...d, valor: formatarValorDigitado(String(Math.round(d.valor * 100))) }); };
+  const iniciarEdicao = (d) => { setRepetirNaEdicao(false); setMesesNaEdicao("12"); setErroNaEdicao(""); setConfirmarAcao(null); setEditandoId(d.id); setRascunho({ ...d, valor: formatarValorDigitado(String(Math.round(d.valor * 100))) }); };
 
   const salvarEdicao = () => {
     const valor = valorMascaradoParaNumero(rascunho.valor);
     if (!rascunho.descricao.trim() || !rascunho.vencimento || !(valor > 0)) return;
-    onAtualizarDespesas(despesas.map((d) =>
-      d.id === editandoId
-        ? { ...d, descricao: rascunho.descricao.trim(), valor, vencimento: rascunho.vencimento, categoria: rascunho.categoria }
-        : d
-    ));
+    const original = despesas.find((d) => d.id === editandoId);
+    if (!original) return;
+    const atualizada = { ...original, descricao: rascunho.descricao.trim(), valor, vencimento: rascunho.vencimento, categoria: rascunho.categoria };
+    let registros = [atualizada];
+    setErroNaEdicao("");
+    if (repetirNaEdicao && !original.recorrenciaGrupoId) {
+      try {
+        registros = criarDespesasMensais(atualizada, Number(mesesNaEdicao));
+        registros[0] = { ...registros[0], paga: original.paga };
+      } catch (erro) { setErroNaEdicao(erro.message); return; }
+    }
+    onAtualizarDespesas([...despesas.map((d) => d.id === editandoId ? registros[0] : d), ...registros.slice(1)]);
     setEditandoId(null);
     setRascunho(null);
     setMesSelecionado(chaveDoMes(rascunho.vencimento));
@@ -1506,6 +1516,11 @@ function DespesasTab({ atalho, despesas, onRegistrarExclusao, onAtualizarDespesa
             <Campo label="Valor (R$)"><input inputMode="numeric" value={rascunho.valor} onChange={(e) => setRascunho({ ...rascunho, valor: formatarValorDigitado(e.target.value) })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
             <Campo label="Vencimento"><input type="date" value={rascunho.vencimento} onChange={(e) => setRascunho({ ...rascunho, vencimento: e.target.value })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo>
             <Campo label="Categoria"><select value={rascunho.categoria} onChange={(e) => setRascunho({ ...rascunho, categoria: e.target.value })} className={inputBase + " w-full"} style={{ borderColor: COR.linha }}>{CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}</select></Campo>
+            {!rascunho.recorrenciaGrupoId && <>
+              <label className="flex items-center gap-2 text-sm font-medium" style={{ color: COR.tintaSuave }}><input type="checkbox" checked={repetirNaEdicao} onChange={(e) => { setRepetirNaEdicao(e.target.checked); setErroNaEdicao(""); }} style={{ accentColor: COR.ouro, minHeight: 16 }} />Repetir mensalmente</label>
+              {repetirNaEdicao && <><Campo label="Quantidade de meses"><input type="number" min="1" max="120" step="1" value={mesesNaEdicao} onChange={(e) => setMesesNaEdicao(e.target.value)} className={inputBase + " w-full"} style={{ borderColor: COR.linha }} /></Campo><p className="text-xs" style={{ color: COR.tintaSuave }}>Inclui o mês desta despesa. As próximas repetições serão criadas como pendentes, com o mesmo valor e dia de vencimento.</p></>}
+              {erroNaEdicao && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erroNaEdicao}</p>}
+            </>}
             {rascunho.recorrenciaGrupoId && <button type="button" onClick={() => setConfirmarAcao("parar")} className="text-sm font-semibold p-3 rounded-xl text-left" style={{ background: COR.papelEscuro, color: COR.vermelho }}>Parar repetições</button>}
             <button type="button" onClick={() => setConfirmarAcao("excluir")} className="flex items-center gap-2 text-sm font-semibold" style={{ color: COR.vermelho }}><Trash2 size={18} />Excluir despesa</button>
             {confirmarAcao && <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "#FEF2F2" }}>
