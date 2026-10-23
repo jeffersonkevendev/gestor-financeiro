@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
-  PawPrint, Pizza, Laptop, ShoppingBasket, Settings2, Search, Mic, ShoppingCart, Filter, Image as IconeImagem, Car, Utensils, Cross, Wifi, Flame, Gift, Smartphone, GraduationCap, Shirt, Dumbbell, HeartPulse, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
+  Bell, PawPrint, Pizza, Laptop, ShoppingBasket, Settings2, Search, Mic, ShoppingCart, Filter, Image as IconeImagem, Car, Utensils, Cross, Wifi, Flame, Gift, Smartphone, GraduationCap, Shirt, Dumbbell, HeartPulse, Clock, CalendarDays, Plus, Pencil, Trash2, Check, X, Wallet, CreditCard, ArrowRight, FileDown,
   CheckCircle2, Circle, Download, LogOut, Mail, Lock, Eye, EyeOff, UserPlus, ShieldCheck,
   ArrowLeft, User, Phone, Calculator as IconeCalculadora, Delete, Home,
   BarChart3, MoreHorizontal, ChevronRight, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle,
@@ -696,7 +696,8 @@ function MeuCaixaApp({ usuario }) {
               </div>
               <h1 className="fonte-display text-2xl" style={{ color: COR.tinta }}>Meu Caixa</h1>
             </div>
-            <div className="relative">
+            <div className="relative flex items-center gap-3">
+              {aba === "inicio" && <AvisosVencimentos despesas={despesas} cartoes={cartoes} pessoasAutomaticas={pessoasAutomaticas} pagamentosCartaoPagos={pagamentosCartaoPagos} onAbrir={(mes) => { setAtalhoDespesas({ filtro: "Pendentes", mes }); setAba("despesas"); setCartaoSelecionadoId(null); }} />}
               <button aria-label="Abrir perfil" onClick={() => setAba("perfil")} className="w-8 h-8 rounded-full overflow-hidden border-2" style={{ borderColor: COR.linha }}>
                 {usuario.photoURL ? (
                   <img src={usuario.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1087,6 +1088,68 @@ function restaurarRegistrosPorId(atuais, removidos) {
   return [...atuais, ...removidos.filter((r) => !ids.has(r.id))];
 }
 
+function listarAvisosVencimentos(despesas, cartoes, pessoas, pagamentos, hoje) {
+  const dataUTC = (data) => { const [a, m, d] = String(data).split("-").map(Number); return Date.UTC(a, m - 1, d); };
+  const inicio = dataUTC(hoje);
+  const candidatos = despesas.filter((d) => !d.paga).map((d) => ({ id: `despesa-${d.id}`, nome: d.descricao, valor: d.valor, vencimento: d.vencimento }));
+  for (const cartao of cartoes) {
+    const porMes = {};
+    for (const compra of cartao.compras || []) { const mes = chaveDoMes(compra.data); (porMes[mes] ||= []).push(compra); }
+    for (const mes of Object.keys(porMes)) {
+      const vencimento = dataVencimentoCartao(cartao, mes);
+      const valor = totalAutomaticoEmMes(porMes, mes, pessoas, cartao);
+      if (vencimento && valor > 0 && !pagamentos[`${cartao.id}-${mes}`]) candidatos.push({ id: `cartao-${cartao.id}-${mes}`, nome: cartao.nome, valor, vencimento });
+    }
+  }
+  return candidatos.map((a) => ({ ...a, dias: Math.round((dataUTC(a.vencimento) - inicio) / 86400000) }))
+    .filter((a) => Number.isFinite(a.dias) && a.dias <= 7)
+    .sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.nome.localeCompare(b.nome));
+}
+
+function AvisosVencimentos({ despesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, onAbrir }) {
+  const [aberto, setAberto] = useState(false);
+  const dataLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const [hoje, setHoje] = useState(dataLocal);
+  useEffect(() => { const timer = setInterval(() => setHoje(dataLocal()), 60000); return () => clearInterval(timer); }, []);
+  const botaoRef = useRef(null), fecharRef = useRef(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    fecharRef.current?.focus();
+    const tecla = (e) => {
+      if (e.key === "Escape") setAberto(false);
+      if (e.key === "Tab") {
+        const botoes = e.currentTarget === document ? document.getElementById("avisos-vencimentos")?.querySelectorAll("button") : null;
+        if (!botoes?.length) return;
+        const primeiro = botoes[0], ultimo = botoes[botoes.length - 1];
+        if (e.shiftKey && document.activeElement === primeiro) { e.preventDefault(); ultimo.focus(); }
+        else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primeiro.focus(); }
+      }
+    };
+    document.addEventListener("keydown", tecla);
+    return () => { document.body.style.overflow = anterior; document.removeEventListener("keydown", tecla); botaoRef.current?.focus(); };
+  }, [aberto]);
+  const avisos = listarAvisosVencimentos(despesas, cartoes, pessoasAutomaticas, pagamentosCartaoPagos, hoje);
+  const texto = (dias) => dias < 0 ? `Atrasada há ${-dias} ${dias === -1 ? "dia" : "dias"}` : dias === 0 ? "Vence hoje" : dias === 1 ? "Vence amanhã" : `Vence em ${dias} dias`;
+  return <>
+    <button ref={botaoRef} type="button" aria-label={`Avisos de vencimento${avisos.length ? `: ${avisos.length}` : ""}`} aria-haspopup="dialog" aria-expanded={aberto} onClick={() => setAberto(true)} className="relative p-2 rounded-full" style={{ color: COR.tintaSuave }}>
+      <Bell size={22} />{avisos.length > 0 && <span className="absolute -top-1 -right-1 rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] text-white" style={{ background: COR.vermelho }}>{avisos.length > 99 ? "99+" : avisos.length}</span>}
+    </button>
+    {aberto && createPortal(<div className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.35)" }} onClick={() => setAberto(false)}>
+      <section id="avisos-vencimentos" role="dialog" aria-modal="true" aria-labelledby="titulo-avisos" onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-3xl p-5 overflow-y-auto" style={{ background: COR.cartao, maxHeight: "85dvh" }}>
+        <div className="flex items-center justify-between gap-3"><h2 id="titulo-avisos" className="text-lg font-semibold">Avisos de vencimento</h2><button ref={fecharRef} type="button" aria-label="Fechar avisos" onClick={() => setAberto(false)} className="p-2"><X size={22} /></button></div>
+        <p className="text-sm mt-2 mb-3" style={{ color: COR.tintaSuave }}>Contas atrasadas e dos próximos 7 dias.</p>
+        {!avisos.length && <p className="text-sm py-6 text-center" style={{ color: COR.tintaSuave }}>Tudo em dia! Nenhuma conta para este período.</p>}
+        {avisos.map((a) => <button type="button" key={a.id} onClick={() => { setAberto(false); onAbrir(chaveDoMes(a.vencimento)); }} className="w-full text-left flex items-center gap-3 py-4 border-b" style={{ borderColor: COR.linha }}>
+          <span className="p-2 rounded-full shrink-0" style={{ background: a.dias < 0 ? "#FEF2F2" : COR.ouroClaro, color: a.dias < 0 ? COR.vermelho : COR.ouro }}><Clock size={19} /></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm break-words">{a.nome}</span><span className="block text-xs mt-1" style={{ color: a.dias <= 0 ? COR.vermelho : COR.tintaSuave }}>{texto(a.dias)} · {a.vencimento.split("-").reverse().join("/")}</span></span><ChevronRight size={18} style={{ color: COR.tintaSuave }} />
+        </button>)}
+      </section>
+    </div>, document.body)}
+  </>;
+}
+
 // ===================== ABA INÍCIO =====================
 function InicioTab({ receitas = [], onAbrirEntradas, despesas, cartoes, pessoasAutomaticas, primeiroNome, pagamentosCartaoPagos, onIrPara, onAbrirDespesas, onAbrirCalculadora }) {
   const [ocultarValores, setOcultarValores] = useState(false);
@@ -1213,9 +1276,15 @@ function totalEntradasDoMes(receitas, mes) {
     .reduce((centavos, r) => centavos + (Number.isFinite(Number(r.valor)) ? Math.round(Number(r.valor) * 100) : 0), 0) / 100;
 }
 
+function criarEntradasMensais(base, quantidade) {
+  return criarDespesasMensais({ ...base, vencimento: base.data }, quantidade).map(({ vencimento, paga, ...entrada }) => ({ ...entrada, data: vencimento }));
+}
+
 function EntradasTab({ receitas, onAtualizarReceitas, onRegistrarExclusao, onVoltar, nomeUsuario, atalho }) {
   const [mesSelecionado, setMesSelecionado] = useState(mesResumoInicial());
   const [rascunho, setRascunho] = useState(null), [erro, setErro] = useState("");
+  const [repetir, setRepetir] = useState(false), [mesesRepetir, setMesesRepetir] = useState("12");
+  const [pararRepeticoes, setPararRepeticoes] = useState(false);
   useEffect(() => { if (atalho) { setMesSelecionado(atalho.mes); setRascunho(null); setErro(""); } }, [atalho]);
   useEffect(() => {
     if (!rascunho) return;
@@ -1227,8 +1296,9 @@ function EntradasTab({ receitas, onAtualizarReceitas, onRegistrarExclusao, onVol
   const entradas = receitas.filter((r) => chaveDoMes(r.data || r.vencimento) === mesSelecionado).slice().sort((a, b) => (a.data || a.vencimento || "").localeCompare(b.data || b.vencimento || ""));
   const pessoas = [...new Set([nomeUsuario, "Jefferson", "Filipe", ...receitas.map((r) => r.pessoa)].filter(Boolean))];
   const abrir = (entrada) => {
+    setRepetir(false); setMesesRepetir("12"); setPararRepeticoes(false);
     setErro("");
-    setRascunho(entrada ? { ...entrada, pessoa: entrada.pessoa || "", data: entrada.data || entrada.vencimento || `${mesSelecionado}-01`, valor: Number(entrada.valor).toFixed(2).replace(".", ",") } : { descricao: "", pessoa: nomeUsuario || "", valor: "", data: `${mesSelecionado}-01` });
+    setRascunho(entrada ? { ...entrada, dataOriginal: entrada.data || entrada.vencimento, pessoa: entrada.pessoa || "", data: entrada.data || entrada.vencimento || `${mesSelecionado}-01`, valor: Number(entrada.valor).toFixed(2).replace(".", ",") } : { descricao: "", pessoa: nomeUsuario || "", valor: "", data: `${mesSelecionado}-01` });
   };
   const salvar = (evento) => {
     evento.preventDefault();
@@ -1236,8 +1306,20 @@ function EntradasTab({ receitas, onAtualizarReceitas, onRegistrarExclusao, onVol
     if (!rascunho.descricao.trim() || !rascunho.pessoa.trim()) { setErro("Preencha a descrição e o nome de quem recebeu."); return; }
     if (!Number.isFinite(valor) || valor <= 0) { setErro("Informe um valor maior que zero."); return; }
     if (!/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(data) || Number.isNaN(Date.parse(data)) || new Date(data).toISOString().slice(0, 10) !== data) { setErro("Escolha uma data válida."); return; }
-    const entrada = { ...rascunho, id: rascunho.id || uid(), descricao: rascunho.descricao.trim(), pessoa: rascunho.pessoa.trim(), valor: Math.round(valor * 100) / 100, data };
-    onAtualizarReceitas((anteriores) => rascunho.id ? anteriores.map((r) => r.id === rascunho.id ? entrada : r) : [...anteriores, entrada]);
+    const { dataOriginal, ...dadosEntrada } = rascunho;
+    const entrada = { ...dadosEntrada, id: rascunho.id || uid(), descricao: rascunho.descricao.trim(), pessoa: rascunho.pessoa.trim(), valor: Math.round(valor * 100) / 100, data };
+    let registros = [entrada];
+    if (repetir && !entrada.recorrenciaGrupoId) {
+      try { registros = criarEntradasMensais(entrada, Number(mesesRepetir)); }
+      catch (e) { setErro(e.message.replace("a despesa", "a entrada")); return; }
+    }
+    const futuras = pararRepeticoes && entrada.recorrenciaGrupoId ? receitas.filter((r) => r.id !== entrada.id && r.recorrenciaGrupoId === entrada.recorrenciaGrupoId && (r.data || r.vencimento) > (rascunho.dataOriginal || entrada.data)) : [];
+    const idsRemover = new Set(futuras.map((r) => r.id));
+    if (futuras.length) onRegistrarExclusao(futuras);
+    onAtualizarReceitas((anteriores) => {
+      const mantidas = anteriores.filter((r) => !idsRemover.has(r.id));
+      return rascunho.id ? [...mantidas.map((r) => r.id === rascunho.id ? registros[0] : r), ...registros.slice(1)] : [...mantidas, ...registros];
+    });
     setMesSelecionado(chaveDoMes(data)); setRascunho(null); setErro("");
   };
   const excluir = (entrada) => { onAtualizarReceitas((anteriores) => anteriores.filter((r) => r.id !== entrada.id)); onRegistrarExclusao([entrada]); };
@@ -1260,6 +1342,10 @@ function EntradasTab({ receitas, onAtualizarReceitas, onRegistrarExclusao, onVol
         <label className="text-sm">Quem recebeu<input required list="pessoas-entradas" placeholder="Jefferson, Filipe..." value={rascunho.pessoa} onChange={(e) => setRascunho((r) => ({ ...r, pessoa: e.target.value }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /><datalist id="pessoas-entradas">{pessoas.map((p) => <option key={p} value={p} />)}</datalist></label>
         <label className="text-sm">Valor (R$)<input required inputMode="decimal" placeholder="0,00" value={rascunho.valor} onChange={(e) => setRascunho((r) => ({ ...r, valor: formatarValorDigitado(e.target.value) }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /></label>
         <label className="text-sm">Data do recebimento<input required type="date" value={rascunho.data} onChange={(e) => setRascunho((r) => ({ ...r, data: e.target.value }))} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /></label>
+        {!rascunho.recorrenciaGrupoId ? <>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={repetir} onChange={(e) => setRepetir(e.target.checked)} style={{ accentColor: COR.ouro }} />Repetir mensalmente</label>
+          {repetir && <><label className="text-sm">Quantidade de meses<input type="number" min="1" max="120" step="1" value={mesesRepetir} onChange={(e) => setMesesRepetir(e.target.value)} className="block w-full mt-1 border rounded-xl p-3" style={inputStyle} /></label><p className="text-xs" style={{ color: COR.tintaSuave }}>Inclui o mês inicial. O mesmo valor será lançado nos meses seguintes. Você pode ajustar cada entrada depois.</p></>}
+        </> : <><p className="text-xs" style={{ color: COR.tintaSuave }}>Entrada com repetição mensal. A edição altera somente este mês.</p><label className="flex items-center gap-2 text-sm" style={{ color: COR.vermelho }}><input type="checkbox" checked={pararRepeticoes} onChange={(e) => setPararRepeticoes(e.target.checked)} />Parar próximas repetições ao salvar</label></>}
         {erro && <p role="alert" className="text-sm" style={{ color: COR.vermelho }}>{erro}</p>}
         <div className="flex gap-3"><button type="button" onClick={() => setRascunho(null)} className="flex-1 rounded-xl p-3 text-sm" style={{ background: COR.papelEscuro }}>Cancelar</button><button type="submit" className="flex-1 rounded-xl p-3 text-sm text-white" style={{ background: COR.ouro }}>Salvar entrada</button></div>
       </form>
